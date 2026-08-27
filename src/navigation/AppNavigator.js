@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import {
   DrawerToggleButton,
   createDrawerNavigator,
@@ -15,6 +16,7 @@ import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchScreen from '../screens/SearchScreen';
 import SignupScreen from '../screens/SignupScreen';
@@ -31,6 +33,7 @@ const MyCustomersStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const BusinessStack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
+const LegalStack = createNativeStackNavigator();
 
 const stackScreenOptions = {
   headerStyle: { backgroundColor: COLORS.primary },
@@ -49,9 +52,13 @@ const rootScreenOptions = (title) => ({
   headerLeft: drawerToggle,
 });
 
-const glyph = (character) =>
-  function NavIcon({ color }) {
-    return <Text style={[styles.icon, { color }]}>{character}</Text>;
+/**
+ * Vector icons rather than emoji: emoji render in their own colours, ignore
+ * the active/inactive tint, and vary by platform and OS version.
+ */
+const icon = (name) =>
+  function NavIcon({ color, size = 22 }) {
+    return <Ionicons name={name} size={size} color={color} />;
   };
 
 const NewBillNavigator = () => (
@@ -109,6 +116,16 @@ const BusinessNavigator = () => (
   </BusinessStack.Navigator>
 );
 
+const LegalNavigator = () => (
+  <LegalStack.Navigator screenOptions={stackScreenOptions}>
+    <LegalStack.Screen
+      name="PrivacyPolicy"
+      component={PrivacyPolicyScreen}
+      options={rootScreenOptions('Privacy Policy')}
+    />
+  </LegalStack.Navigator>
+);
+
 const OnboardingBusinessScreen = () => <BusinessProfileScreen onboarding />;
 
 /**
@@ -147,12 +164,12 @@ const MainTabs = () => (
     <Tab.Screen
       name="NewBillTab"
       component={NewBillNavigator}
-      options={{ title: 'New Bill', tabBarIcon: glyph('🧾') }}
+      options={{ title: 'New Bill', tabBarIcon: icon('receipt-outline') }}
     />
     <Tab.Screen
       name="CustomersTab"
       component={CustomersNavigator}
-      options={{ title: 'Search', tabBarIcon: glyph('🔍') }}
+      options={{ title: 'Search', tabBarIcon: icon('search-outline') }}
     />
   </Tab.Navigator>
 );
@@ -173,22 +190,30 @@ const MainDrawer = () => (
     <Drawer.Screen
       name="Billing"
       component={MainTabs}
-      options={{ title: 'Billing', drawerIcon: glyph('🧾') }}
+      options={{ title: 'Billing', drawerIcon: icon('receipt-outline') }}
     />
     <Drawer.Screen
       name="MyCustomersRoot"
       component={MyCustomersNavigator}
-      options={{ title: 'My Customers', drawerIcon: glyph('👥') }}
+      options={{ title: 'My Customers', drawerIcon: icon('people-outline') }}
     />
     <Drawer.Screen
       name="BusinessProfileRoot"
       component={BusinessNavigator}
-      options={{ title: 'Bill Details', drawerIcon: glyph('🧑‍💼') }}
+      options={{ title: 'Bill Details', drawerIcon: icon('document-text-outline') }}
     />
     <Drawer.Screen
       name="Profile"
       component={ProfileNavigator}
-      options={{ title: 'My Profile', drawerIcon: glyph('👤') }}
+      options={{ title: 'My Profile', drawerIcon: icon('person-circle-outline') }}
+    />
+    <Drawer.Screen
+      name="PrivacyPolicyRoot"
+      component={LegalNavigator}
+      options={{
+        title: 'Privacy Policy',
+        drawerIcon: icon('shield-checkmark-outline'),
+      }}
     />
   </Drawer.Navigator>
 );

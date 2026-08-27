@@ -1,8 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import {
   DrawerContentScrollView,
   DrawerItemList,
 } from '@react-navigation/drawer';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { useAuth } from '../store/AuthContext';
@@ -21,36 +23,51 @@ const initialsOf = (name) =>
 const DrawerContent = (props) => {
   const { profile } = useProfile();
   const { logout } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const openProfile = () => props.navigation.navigate('Profile');
 
   return (
     <View style={styles.container}>
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
-        <Pressable
-          onPress={openProfile}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-          style={({ pressed }) => [styles.header, pressed && styles.pressed]}
-        >
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialsOf(profile?.username)}</Text>
-          </View>
-          <Text style={styles.name} numberOfLines={1}>
-            {profile?.username || 'Shop owner'}
-          </Text>
-          {!!profile?.email && (
-            <Text style={styles.meta} numberOfLines={1}>
-              {profile.email}
-            </Text>
-          )}
-          {!!profile?.phone && (
-            <Text style={styles.meta} numberOfLines={1}>
-              {profile.phone}
-            </Text>
-          )}
-          <Text style={styles.viewProfile}>View profile</Text>
-        </Pressable>
+        {/* Padding comes from the live inset rather than a guessed constant,
+            so the avatar clears the notch on every device. */}
+        <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
+          <Pressable
+            onPress={openProfile}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <View style={styles.identityRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {initialsOf(profile?.business_name || profile?.username)}
+                </Text>
+              </View>
+              <View style={styles.identityText}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {profile?.business_name || profile?.username || 'Shop owner'}
+                </Text>
+                {!!profile?.email && (
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {profile.email}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.viewProfileRow}>
+              <Text style={styles.viewProfile}>View profile</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={COLORS.white}
+                style={styles.chevron}
+              />
+            </View>
+          </Pressable>
+        </View>
 
         <View style={styles.items}>
           <DrawerItemList {...props} />
@@ -60,8 +77,13 @@ const DrawerContent = (props) => {
       <Pressable
         onPress={logout}
         accessibilityRole="button"
-        style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.signOut,
+          { paddingBottom: insets.bottom + SPACING.md },
+          pressed && styles.pressed,
+        ]}
       >
+        <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
     </View>
@@ -69,53 +91,57 @@ const DrawerContent = (props) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: COLORS.card },
   scroll: { paddingTop: 0 },
   header: {
     backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    paddingTop: SPACING.xl + SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
     marginBottom: SPACING.sm,
   },
   pressed: { opacity: 0.85 },
+  identityRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
   },
   avatarText: {
-    fontSize: FONT_SIZES.lg,
+    fontSize: FONT_SIZES.md,
     fontWeight: '700',
     color: COLORS.primary,
   },
-  name: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
-  meta: {
-    color: COLORS.primaryLight,
-    fontSize: FONT_SIZES.xs,
-    marginTop: 2,
+  identityText: { flex: 1, marginLeft: SPACING.sm },
+  name: { color: COLORS.white, fontSize: FONT_SIZES.md, fontWeight: '700' },
+  meta: { color: COLORS.primaryLight, fontSize: FONT_SIZES.xs, marginTop: 2 },
+  viewProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
   },
   viewProfile: {
     color: COLORS.white,
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
-    marginTop: SPACING.sm,
-    textDecorationLine: 'underline',
   },
+  chevron: { marginLeft: 2 },
   items: { paddingTop: SPACING.xs },
   signOut: {
-    borderTopWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.border,
-    padding: SPACING.md,
-    paddingBottom: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
   },
   signOutText: {
     color: COLORS.danger,
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
+    marginLeft: SPACING.sm,
   },
 });
 
