@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aayashahmad.billingapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -15,7 +16,9 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.aayashahmad.billingapp",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -24,8 +27,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Billing to access your photos so you can attach a transaction screenshot to a bill.",
-          "cameraPermission": "Allow Billing to use the camera so you can capture a transaction screenshot for a bill."
+          "photosPermission": "Allow Billing to access your photos so you can attach proof of payment to a bill \u2014 a transaction screenshot or a photo of a cheque. Only the image you pick is used.",
+          "cameraPermission": "Allow Billing to use the camera so you can photograph a cheque or capture proof of payment for a bill.",
+          "microphonePermission": false
         }
       ],
       "expo-secure-store",
