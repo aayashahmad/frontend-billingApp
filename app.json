@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "BillingAppTemp",
+    "name": "Billing",
     "slug": "BillingAppTemp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,6 +19,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Billing to access your photos so you can attach a transaction screenshot to a bill.",
+          "cameraPermission": "Allow Billing to use the camera so you can capture a transaction screenshot for a bill."
+        }
+      ]
+    ]
   }
 }
