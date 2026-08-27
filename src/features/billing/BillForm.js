@@ -8,13 +8,19 @@ import CustomerSummaryCard from '../../components/CustomerSummaryCard';
 import ImagePickerField from '../../components/ImagePickerField';
 import Input from '../../components/Input';
 import {
+  PAYMENT_REFERENCE_LABELS,
   PAYMENT_TYPES,
   PHONE_MAX_LENGTH,
 } from '../../constants/paymentTypes';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCustomerLookup } from '../../hooks/useCustomerLookup';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { calculateBillTotal, calculateUnbalance } from '../../utils/billing';
+import {
+  calculateBillTotal,
+  calculateUnbalance,
+  hasPaymentReference,
+  usesEnteredAmount,
+} from '../../utils/billing';
 import { formatCurrency } from '../../utils/money';
 import {
   INITIAL_BILL_VALUES,
@@ -34,11 +40,22 @@ const BillFormFields = ({
   handleSubmit,
   submitting,
   submitError,
+  onClearSubmitError,
 }) => {
   const { customer, isNewCustomer, loading: lookingUp, error: lookupError, lookup, reset: resetLookup } =
     useCustomerLookup();
 
   const debouncedPhone = useDebouncedValue(values.phone, PHONE_LOOKUP_DEBOUNCE_MS);
+
+  // A rejected submit leaves its message on screen. Clear it the moment the
+  // user edits anything, otherwise "Cheque number is required" keeps showing
+  // while they are typing the cheque number that fixes it.
+  useEffect(() => {
+    if (submitError) onClearSubmitError?.();
+    // Intentionally keyed on `values` alone: this should fire on edits, not
+    // when the error itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values]);
 
   // Once the user edits the name themselves, a later auto-fill must not
   // overwrite it — until they switch to a different phone number.
@@ -59,8 +76,11 @@ const BillFormFields = ({
     };
   }, [debouncedPhone, lookup, setFieldValue]);
 
-  const isCash = values.paymentType === PAYMENT_TYPES.CASH;
-  const isOnline = values.paymentType === PAYMENT_TYPES.ONLINE;
+  // Cash and cheque both take an entered amount; online and cheque both
+  // take a reference number plus an image.
+  const entersAmount = usesEnteredAmount(values.paymentType);
+  const needsReference = hasPaymentReference(values.paymentType);
+  const referenceLabels = PAYMENT_REFERENCE_LABELS[values.paymentType];
 
   const billTotal = useMemo(
     () => calculateBillTotal(values.qty, values.rate),
@@ -68,8 +88,8 @@ const BillFormFields = ({
   );
 
   const unbalance = useMemo(
-    () => (isCash ? calculateUnbalance(billTotal, values.amountPaid) : 0),
-    [isCash, billTotal, values.amountPaid],
+    () => (entersAmount ? calculateUnbalance(billTotal, values.amountPaid) : 0),
+    [entersAmount, billTotal, values.amountPaid],
   );
 
   const handlePhoneChange = useCallback(
@@ -96,10 +116,11 @@ const BillFormFields = ({
       setFieldValue('paymentType', nextType);
       // Clear the fields belonging to the other branch so a switch never
       // submits stale values from the previous payment type.
-      if (nextType === PAYMENT_TYPES.CASH) {
+      if (!hasPaymentReference(nextType)) {
         setFieldValue('transactionNumber', '');
         setFieldValue('transactionScreenshot', null);
-      } else {
+      }
+      if (!usesEnteredAmount(nextType)) {
         setFieldValue('amountPaid', '');
       }
     },
@@ -204,7 +225,7 @@ const BillFormFields = ({
           <Text style={styles.totalLabel}>Bill total</Text>
           <Text style={styles.totalValue}>{formatCurrency(billTotal)}</Text>
         </View>
-        {isCash && (
+        {entersAmount && (
           <View style={[styles.totalRow, styles.totalRowSpaced]}>
             <Text style={styles.totalLabel}>Balance due</Text>
             <Text
@@ -226,7 +247,7 @@ const BillFormFields = ({
         disabled={submitting}
       />
 
-      {isCash && (
+      {entersAmount && (
         <Input
           label="Amount paid"
           placeholder="0.00"
@@ -242,11 +263,11 @@ const BillFormFields = ({
         />
       )}
 
-      {isOnline && (
+      {needsReference && (
         <>
           <Input
-            label="Transaction number (UTR / reference)"
-            placeholder="Enter reference number"
+            label={referenceLabels.number}
+            placeholder={referenceLabels.numberPlaceholder}
             value={values.transactionNumber}
             onChangeText={(text) => setFieldValue('transactionNumber', text)}
             onBlur={handleBlur('transactionNumber')}
@@ -255,7 +276,8 @@ const BillFormFields = ({
             editable={!submitting}
           />
           <ImagePickerField
-            label="Transaction screenshot"
+            label={referenceLabels.image}
+            emptyText={referenceLabels.imageEmpty}
             value={values.transactionScreenshot}
             onChange={handleScreenshotChange}
             error={fieldError('transactionScreenshot')}
@@ -278,7 +300,7 @@ const BillFormFields = ({
   );
 };
 
-const BillForm = ({ onSubmitBill, submitting, submitError }) => {
+const BillForm = ({ onSubmitBill, submitting, submitError, onClearSubmitError }) => {
   const handleFormikSubmit = useCallback(
     async (values, helpers) => {
       const result = await onSubmitBill(values);
@@ -300,6 +322,7 @@ const BillForm = ({ onSubmitBill, submitting, submitError }) => {
           {...formik}
           submitting={submitting}
           submitError={submitError}
+          onClearSubmitError={onClearSubmitError}
         />
       )}
     </Formik>

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_TIMEOUT_MS, API_URL } from '../constants/config';
 
 export const HTTP_STATUS = Object.freeze({
+  UNAUTHORIZED: 401,
   NOT_FOUND: 404,
   UNPROCESSABLE: 422,
 });
@@ -26,6 +27,41 @@ const readDetail = (detail) => {
   return null;
 };
 
+/**
+ * Auth token holder.
+ *
+ * Kept as module state rather than read from AuthContext so the axios
+ * instance never imports React state — the context pushes the token down,
+ * which also avoids a circular import between api.js and AuthContext.
+ */
+let authToken = null;
+let onUnauthorized = null;
+
+export const setAuthToken = (token) => {
+  authToken = token || null;
+};
+
+/** Registered by AuthContext so an expired token logs the user out. */
+export const setUnauthorizedHandler = (handler) => {
+  onUnauthorized = handler;
+};
+
+/**
+ * Auth headers for consumers that bypass axios.
+ *
+ * React Native's <Image> fetches its own URL, so it never passes through the
+ * request interceptor — it needs the bearer token handed to it directly.
+ */
+export const getAuthHeaders = () =>
+  authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+
+api.interceptors.request.use((config) => {
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  }
+  return config;
+});
+
 export class ApiError extends Error {
   constructor(message, { status = null, isNetworkError = false } = {}) {
     super(message);
@@ -36,6 +72,10 @@ export class ApiError extends Error {
 
   get isNotFound() {
     return this.status === HTTP_STATUS.NOT_FOUND;
+  }
+
+  get isUnauthorized() {
+    return this.status === HTTP_STATUS.UNAUTHORIZED;
   }
 }
 
@@ -73,7 +113,13 @@ export const toApiError = (error) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(toApiError(error)),
+  (error) => {
+    const apiError = toApiError(error);
+    // A rejected token means the stored session is dead — drop it so the app
+    // returns to the login screen instead of retrying with a stale token.
+    if (apiError.isUnauthorized) onUnauthorized?.();
+    return Promise.reject(apiError);
+  },
 );
 
 export const isCancelled = (error) => Boolean(error?.isCancelled);

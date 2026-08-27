@@ -86,9 +86,11 @@ describe('billValidationSchema — shared fields', () => {
   });
 
   it('rejects an unknown payment type', async () => {
+    // 'cheque' used to stand in for an invalid type here; it is a supported
+    // type now, so this needs a value that genuinely is not one.
     const paths = await errorPaths({
       ...validCashBill,
-      paymentType: 'cheque',
+      paymentType: 'barter',
     });
     expect(paths).toContain('paymentType');
   });
@@ -179,5 +181,57 @@ describe('billValidationSchema — online bills', () => {
   it('does not require amountPaid', async () => {
     const paths = await errorPaths({ ...validOnlineBill, amountPaid: '' });
     expect(paths).not.toContain('amountPaid');
+  });
+});
+
+describe('cheque payments', () => {
+  const chequeBill = {
+    phone: '9876543210',
+    customerName: 'Asha Traders',
+    itemName: 'Cement',
+    qty: '2',
+    rate: '500',
+    paymentType: PAYMENT_TYPES.CHEQUE,
+    amountPaid: '600',
+    transactionNumber: 'CHQ-100234',
+    transactionScreenshot: { uri: 'file://cheque.jpg' },
+  };
+
+  const paths = async (values) => {
+    try {
+      await billValidationSchema.validate(values, { abortEarly: false });
+      return [];
+    } catch (error) {
+      return [...new Set(error.inner.map((issue) => issue.path))].sort();
+    }
+  };
+
+  it('accepts a complete cheque bill', async () => {
+    await expect(paths(chequeBill)).resolves.toEqual([]);
+  });
+
+  it('requires the cheque number', async () => {
+    const result = await paths({ ...chequeBill, transactionNumber: '' });
+    expect(result).toContain('transactionNumber');
+  });
+
+  it('requires the cheque image', async () => {
+    const result = await paths({ ...chequeBill, transactionScreenshot: null });
+    expect(result).toContain('transactionScreenshot');
+  });
+
+  it('requires an amount paid, unlike an online transfer', async () => {
+    const result = await paths({ ...chequeBill, amountPaid: '' });
+    expect(result).toContain('amountPaid');
+  });
+
+  it('allows a partial cheque amount', async () => {
+    // 2 x 500 = 1000 billed, cheque written for 600.
+    await expect(paths({ ...chequeBill, amountPaid: '600' })).resolves.toEqual([]);
+  });
+
+  it('rejects a cheque amount above the bill total', async () => {
+    const result = await paths({ ...chequeBill, amountPaid: '1500' });
+    expect(result).toContain('amountPaid');
   });
 });

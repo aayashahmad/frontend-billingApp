@@ -23,6 +23,27 @@ export const isOnlinePayment = (paymentType) =>
 
 export const isCashPayment = (paymentType) => paymentType === PAYMENT_TYPES.CASH;
 
+export const isChequePayment = (paymentType) =>
+  paymentType === PAYMENT_TYPES.CHEQUE;
+
+/**
+ * Whether this payment type carries a reference number and supporting image.
+ * True for online transfers (UTR + screenshot) and cheques (number + photo).
+ */
+export const hasPaymentReference = (paymentType) =>
+  isOnlinePayment(paymentType) || isChequePayment(paymentType);
+
+/**
+ * Whether the amount paid is entered by the user rather than implied.
+ *
+ * Online transfers settle the bill in full, so the amount is derived. Cash and
+ * cheque are both entered — a cheque is frequently written for part of the
+ * balance, and it can bounce, so recording the figure is more truthful than
+ * assuming full settlement.
+ */
+export const usesEnteredAmount = (paymentType) =>
+  isCashPayment(paymentType) || isChequePayment(paymentType);
+
 /**
  * Per-bill view model. The API stores `amount_paid`/`unbalance` as null for
  * online bills; normalise them here so list items never branch on null.

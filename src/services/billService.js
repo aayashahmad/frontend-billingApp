@@ -1,4 +1,4 @@
-import { PAYMENT_TYPES } from '../constants/paymentTypes';
+import { hasPaymentReference, usesEnteredAmount } from '../utils/billing';
 import api from './api';
 
 const inferFileName = (asset) => {
@@ -36,17 +36,23 @@ const buildBillFormData = ({
   formData.append('rate', String(rate));
   formData.append('payment_type', paymentType);
 
-  if (paymentType === PAYMENT_TYPES.CASH) {
+  // Keyed off the shared predicates rather than a specific payment type, so
+  // adding a type cannot silently drop its fields from the request. Cheque
+  // needs BOTH branches: an entered amount and a reference plus image.
+  if (usesEnteredAmount(paymentType)) {
     formData.append('amount_paid', String(amountPaid ?? 0));
   }
 
-  if (paymentType === PAYMENT_TYPES.ONLINE) {
-    formData.append('transaction_number', String(transactionNumber).trim());
-    formData.append('transaction_screenshot', {
-      uri: transactionScreenshot.uri,
-      name: inferFileName(transactionScreenshot),
-      type: inferMimeType(transactionScreenshot),
-    });
+  if (hasPaymentReference(paymentType)) {
+    formData.append('transaction_number', String(transactionNumber ?? '').trim());
+
+    if (transactionScreenshot?.uri) {
+      formData.append('transaction_screenshot', {
+        uri: transactionScreenshot.uri,
+        name: inferFileName(transactionScreenshot),
+        type: inferMimeType(transactionScreenshot),
+      });
+    }
   }
 
   return formData;

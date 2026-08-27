@@ -1,0 +1,317 @@
+import {
+  PAYMENT_REFERENCE_LABELS,
+  PAYMENT_TYPE_LABELS,
+  PAYMENT_TYPES,
+} from '../../constants/paymentTypes';
+import {
+  aggregateBillTotals,
+  hasPaymentReference,
+  summariseBill,
+} from '../../utils/billing';
+import { formatDateTime } from '../../utils/date';
+import { formatCurrency } from '../../utils/money';
+
+/** Values are interpolated into HTML, so every one must be escaped. */
+export const escapeHtml = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+const BASE_STYLES = `
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #0F172A;
+    margin: 0;
+    padding: 32px;
+    font-size: 13px;
+  }
+  .doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #2563EB;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .shop-name { font-size: 22px; font-weight: 700; margin: 0; }
+  .shop-meta { color: #64748B; font-size: 11px; margin-top: 4px; line-height: 1.5; }
+  .doc-type {
+    text-align: right;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #2563EB;
+    font-weight: 700;
+  }
+  .doc-date { color: #64748B; font-size: 11px; margin-top: 4px; }
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748B;
+    margin: 20px 0 8px;
+  }
+  .party { font-size: 15px; font-weight: 700; margin: 0; }
+  .party-meta { color: #64748B; font-size: 12px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748B;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 8px 6px;
+  }
+  td { padding: 8px 6px; border-bottom: 1px solid #F1F5F9; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals { margin-top: 20px; margin-left: auto; width: 260px; }
+  .totals tr td { border: none; padding: 5px 6px; }
+  .totals .label { color: #64748B; }
+  .totals .grand td {
+    border-top: 2px solid #0F172A;
+    font-weight: 700;
+    font-size: 15px;
+    padding-top: 8px;
+  }
+  .due { color: #DC2626; font-weight: 700; }
+  .settled { color: #16A34A; font-weight: 700; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    background: #DBEAFE;
+    color: #1D4ED8;
+  }
+  .badge.cash { background: #DCFCE7; color: #16A34A; }
+  .badge.cheque { background: #FEF3C7; color: #B45309; }
+  .footer {
+    margin-top: 32px;
+    padding-top: 12px;
+    border-top: 1px solid #E2E8F0;
+    color: #94A3B8;
+    font-size: 10px;
+    text-align: center;
+  }
+  .empty { color: #94A3B8; font-style: italic; padding: 16px 6px; }
+`;
+
+/**
+ * Letterhead lines, in print order.
+ *
+ * Each business field falls back to the account detail so a document is never
+ * blank before the owner fills in the Bill Details screen. Blank lines are
+ * dropped rather than printed as gaps.
+ */
+export const buildLetterhead = (owner) => {
+  const phones = [owner?.business_phone || owner?.phone, owner?.business_alt_phone]
+    .map((value) => (value ? String(value).trim() : ''))
+    .filter(Boolean);
+
+  return {
+    name: owner?.business_name || owner?.username || 'Billing',
+    // Address is free text; each typed line becomes its own printed line.
+    addressLines: String(owner?.business_address || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+    email: owner?.business_email || owner?.email || '',
+    phones: [...new Set(phones)],
+    registrationNumber: owner?.registration_number || '',
+    footerNote: owner?.bill_footer_note || '',
+  };
+};
+
+const shopHeader = (owner, docType, issuedAt) => {
+  const head = buildLetterhead(owner);
+  const lines = [
+    ...head.addressLines,
+    head.email,
+    head.phones.join(' · '),
+    head.registrationNumber ? `Reg. No: ${head.registrationNumber}` : '',
+  ].filter(Boolean);
+
+  return `
+  <div class="doc-header">
+    <div>
+      <p class="shop-name">${escapeHtml(head.name)}</p>
+      <div class="shop-meta">
+        ${lines.map((line) => escapeHtml(line)).join('<br/>')}
+      </div>
+    </div>
+    <div>
+      <div class="doc-type">${escapeHtml(docType)}</div>
+      <div class="doc-date">${escapeHtml(issuedAt)}</div>
+    </div>
+  </div>
+`;
+};
+
+const partyBlock = (customer) => `
+  <div class="section-title">Billed to</div>
+  <p class="party">${escapeHtml(customer?.name || 'Walk-in customer')}</p>
+  <div class="party-meta">${escapeHtml(customer?.phone || '')}</div>
+`;
+
+const BADGE_CLASSES = {
+  [PAYMENT_TYPES.CASH]: 'badge cash',
+  [PAYMENT_TYPES.ONLINE]: 'badge',
+  [PAYMENT_TYPES.CHEQUE]: 'badge cheque',
+};
+
+const paymentBadge = (paymentType) => {
+  const label = PAYMENT_TYPE_LABELS[paymentType] ?? paymentType ?? '';
+  const cls = BADGE_CLASSES[paymentType] ?? 'badge';
+  return `<span class="${cls}">${escapeHtml(label)}</span>`;
+};
+
+const wrap = (title, body) => `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+    <style>${BASE_STYLES}</style>
+  </head>
+  <body>${body}</body>
+</html>`;
+
+/** Single-bill receipt. */
+export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
+  const { billTotal, amountPaid, unbalance } = summariseBill(bill);
+  const issuedAt = formatDateTime(bill?.created_at);
+
+  // Online transfers and cheques both carry a reference; the label differs.
+  const referenceLabel =
+    PAYMENT_REFERENCE_LABELS[bill?.payment_type]?.numberShort;
+  const referenceRow = hasPaymentReference(bill?.payment_type)
+    ? `
+        <tr>
+          <td class="label">${escapeHtml(referenceLabel ?? 'Reference')}</td>
+          <td class="num">${escapeHtml(bill.transaction_number || '—')}</td>
+        </tr>`
+    : '';
+
+  const body = `
+    ${shopHeader(owner, 'Receipt', issuedAt)}
+    ${partyBlock(customer)}
+
+    <div class="section-title">Bill #${escapeHtml(bill?.id)}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th class="num">Qty</th>
+          <th class="num">Rate</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${escapeHtml(bill?.item_name)}</td>
+          <td class="num">${escapeHtml(bill?.qty)}</td>
+          <td class="num">${formatCurrency(bill?.rate)}</td>
+          <td class="num">${formatCurrency(billTotal)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table class="totals">
+      <tr>
+        <td class="label">Payment</td>
+        <td class="num">${paymentBadge(bill?.payment_type)}</td>
+      </tr>
+      ${referenceRow}
+      <tr>
+        <td class="label">Amount paid</td>
+        <td class="num">${formatCurrency(amountPaid)}</td>
+      </tr>
+      <tr class="grand">
+        <td>Balance due</td>
+        <td class="num ${unbalance > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(unbalance)}
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">
+      ${escapeHtml(buildLetterhead(owner).footerNote || 'Thank you for your business.')}
+    </div>
+  `;
+
+  return wrap(`Receipt ${bill?.id ?? ''}`, body);
+};
+
+/** Full account statement covering every bill for one customer. */
+export const buildCustomerStatementHtml = ({ customer, bills = [], owner, issuedAt }) => {
+  const { totalAmount, totalUnpaid } = aggregateBillTotals(bills);
+
+  const rows = bills.length
+    ? bills
+        .map((bill) => {
+          const { billTotal, amountPaid, unbalance } = summariseBill(bill);
+          return `
+            <tr>
+              <td>${escapeHtml(formatDateTime(bill.created_at))}</td>
+              <td>${escapeHtml(bill.item_name)}</td>
+              <td class="num">${escapeHtml(bill.qty)}</td>
+              <td>${paymentBadge(bill.payment_type)}</td>
+              <td class="num">${formatCurrency(billTotal)}</td>
+              <td class="num">${formatCurrency(amountPaid)}</td>
+              <td class="num ${unbalance > 0 ? 'due' : ''}">${formatCurrency(unbalance)}</td>
+            </tr>`;
+        })
+        .join('')
+    : `<tr><td class="empty" colspan="7">No bills recorded for this customer yet.</td></tr>`;
+
+  const body = `
+    ${shopHeader(owner, 'Customer statement', issuedAt || '')}
+    ${partyBlock(customer)}
+
+    <div class="section-title">Bill history (${bills.length})</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Item</th>
+          <th class="num">Qty</th>
+          <th>Payment</th>
+          <th class="num">Total</th>
+          <th class="num">Paid</th>
+          <th class="num">Balance</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <table class="totals">
+      <tr>
+        <td class="label">Total billed</td>
+        <td class="num">${formatCurrency(totalAmount)}</td>
+      </tr>
+      <tr class="grand">
+        <td>Outstanding</td>
+        <td class="num ${totalUnpaid > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(totalUnpaid)}
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">
+      ${escapeHtml(
+        buildLetterhead(owner).footerNote ||
+          `Statement issued by ${buildLetterhead(owner).name}.`,
+      )}
+    </div>
+  `;
+
+  return wrap(`Statement — ${customer?.name ?? ''}`, body);
+};

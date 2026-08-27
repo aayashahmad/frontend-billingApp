@@ -7,7 +7,15 @@ import StateView from '../../components/StateView';
 import TransactionImageModal from '../../components/TransactionImageModal';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
+import { useDocumentActions } from '../../hooks/useDocumentActions';
+import { useProfile } from '../../store/ProfileContext';
 import { aggregateBillTotals } from '../../utils/billing';
+import { formatDateTime } from '../../utils/date';
+import DocumentActions from '../printing/DocumentActions';
+import {
+  buildBillReceiptHtml,
+  buildCustomerStatementHtml,
+} from '../printing/documentTemplates';
 
 const keyExtractor = (bill) => String(bill.id);
 
@@ -15,7 +23,13 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   const { customerId, customerName } = route.params;
   const { customer, loading, refreshing, error, refresh } =
     useCustomerDetail(customerId);
+  const { profile: owner, profileLoaded } = useProfile();
   const [selectedBill, setSelectedBill] = useState(null);
+
+  // Separate action states so a per-bill failure never reports itself under
+  // the statement buttons, and vice versa.
+  const statementDocs = useDocumentActions();
+  const billDocs = useDocumentActions();
 
   useEffect(() => {
     const title = customer?.name || customerName;
@@ -34,11 +48,46 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   const handleViewTransaction = useCallback((bill) => setSelectedBill(bill), []);
   const handleCloseTransaction = useCallback(() => setSelectedBill(null), []);
 
+  const buildStatementHtml = useCallback(
+    () =>
+      buildCustomerStatementHtml({
+        customer,
+        bills,
+        owner,
+        issuedAt: formatDateTime(new Date().toISOString()),
+      }),
+    [bills, customer, owner],
+  );
+
   const renderItem = useCallback(
     ({ item }) => (
-      <BillListItem bill={item} onViewTransaction={handleViewTransaction} />
+      <BillListItem
+        bill={item}
+        onViewTransaction={handleViewTransaction}
+        actions={
+          <DocumentActions
+            compact
+            label={`bill-${item.id}-${customer?.name ?? ''}`}
+            buildHtml={() =>
+              buildBillReceiptHtml({ bill: item, customer, owner })
+            }
+            print={billDocs.print}
+            shareAsPdf={billDocs.shareAsPdf}
+            busy={billDocs.busy}
+            disabled={!profileLoaded}
+          />
+        }
+      />
     ),
-    [handleViewTransaction],
+    [
+      billDocs.busy,
+      billDocs.print,
+      billDocs.shareAsPdf,
+      customer,
+      handleViewTransaction,
+      owner,
+      profileLoaded,
+    ],
   );
 
   const listHeader = useMemo(() => {
@@ -50,12 +99,37 @@ const CustomerDetailScreen = ({ route, navigation }) => {
           totalAmount={totalAmount}
           totalUnpaid={totalUnpaid}
         />
+        <DocumentActions
+          label={`statement-${customer.name}-${customer.phone}`}
+          buildHtml={buildStatementHtml}
+          print={statementDocs.print}
+          shareAsPdf={statementDocs.shareAsPdf}
+          busy={statementDocs.busy}
+          error={statementDocs.error}
+          disabled={!profileLoaded}
+          style={styles.statementActions}
+        />
         <Text style={styles.sectionTitle}>
           Bill history{bills.length ? ` (${bills.length})` : ''}
         </Text>
+        {!!billDocs.error && (
+          <Text style={styles.billError}>{billDocs.error}</Text>
+        )}
       </View>
     );
-  }, [bills.length, customer, totalAmount, totalUnpaid]);
+  }, [
+    billDocs.error,
+    bills.length,
+    buildStatementHtml,
+    customer,
+    statementDocs.busy,
+    statementDocs.error,
+    statementDocs.print,
+    statementDocs.shareAsPdf,
+    profileLoaded,
+    totalAmount,
+    totalUnpaid,
+  ]);
 
   if (loading && !customer) {
     return <StateView variant="loading" style={styles.fill} />;
@@ -120,11 +194,17 @@ const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: SPACING.md },
   header: { marginBottom: SPACING.sm },
+  statementActions: { marginTop: SPACING.md },
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
     color: COLORS.text,
     marginTop: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  billError: {
+    color: COLORS.danger,
+    fontSize: FONT_SIZES.xs,
     marginBottom: SPACING.sm,
   },
   emptyState: { paddingVertical: SPACING.xl },

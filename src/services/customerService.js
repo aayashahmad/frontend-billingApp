@@ -20,6 +20,17 @@ export const getCustomerByPhone = async (phone, { signal } = {}) => {
   }
 };
 
+/**
+ * Every customer belonging to the signed-in owner.
+ *
+ * Scoping happens server-side from the bearer token — there is no owner id to
+ * pass, and none should be passable.
+ */
+export const listCustomers = async ({ signal } = {}) => {
+  const { data } = await api.get('/customers', { signal });
+  return Array.isArray(data) ? data : [];
+};
+
 export const searchCustomers = async (query, { signal } = {}) => {
   const { data } = await api.get('/customers/search', {
     params: { q: query },

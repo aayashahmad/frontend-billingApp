@@ -5,7 +5,7 @@ import {
   PHONE_MAX_LENGTH,
   PHONE_MIN_LENGTH,
 } from '../../constants/paymentTypes';
-import { calculateBillTotal } from '../../utils/billing';
+import { calculateBillTotal, hasPaymentReference, usesEnteredAmount } from '../../utils/billing';
 
 /** Yup coerces '' to NaN for number fields; map it to undefined instead. */
 const emptyStringToUndefined = (value, originalValue) =>
@@ -46,7 +46,8 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
     amountPaid: Yup.number()
       .transform(emptyStringToUndefined)
       .when('paymentType', {
-        is: PAYMENT_TYPES.CASH,
+        // Cash and cheque both record an entered figure; online settles in full.
+        is: (paymentType) => usesEnteredAmount(paymentType),
         then: (schema) =>
           schema
             .typeError('Amount paid must be a number')
@@ -68,18 +69,24 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
         otherwise: (schema) => schema.notRequired(),
       }),
 
+    // Shared by online (UTR) and cheque (cheque number); the message names
+    // whichever the user actually picked.
     transactionNumber: Yup.string().when('paymentType', {
-      is: PAYMENT_TYPES.ONLINE,
+      is: (paymentType) => hasPaymentReference(paymentType),
       then: (schema) =>
-        schema.trim().required('Transaction number is required'),
+        schema.trim().when('paymentType', {
+          is: PAYMENT_TYPES.CHEQUE,
+          then: (inner) => inner.required('Cheque number is required'),
+          otherwise: (inner) => inner.required('Transaction number is required'),
+        }),
       otherwise: (schema) => schema.notRequired(),
     }),
 
     transactionScreenshot: Yup.mixed().when('paymentType', {
-      is: PAYMENT_TYPES.ONLINE,
+      is: (paymentType) => hasPaymentReference(paymentType),
       then: (schema) =>
         schema
-          .required('Transaction screenshot is required')
+          .required('Attach a photo of the payment')
           .test(
             'is-image-asset',
             'Attach a valid image',

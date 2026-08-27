@@ -15,7 +15,15 @@ const PICKER_OPTIONS = {
  * Camera / gallery picker returning an ImagePickerAsset
  * (`{ uri, fileName, mimeType }`) to the parent form.
  */
-const ImagePickerField = ({ label, value, onChange, error, disabled }) => {
+const ImagePickerField = ({
+  label,
+  value,
+  onChange,
+  error,
+  disabled,
+  // Named per payment type — a cheque photo is not a "screenshot".
+  emptyText = 'No image attached',
+}) => {
   const [busy, setBusy] = useState(false);
 
   const runPicker = useCallback(
@@ -90,7 +98,7 @@ const ImagePickerField = ({ label, value, onChange, error, disabled }) => {
         </View>
       ) : (
         <View style={[styles.placeholder, !!error && styles.placeholderError]}>
-          <Text style={styles.placeholderText}>No screenshot attached</Text>
+          <Text style={styles.placeholderText}>{emptyText}</Text>
         </View>
       )}
 

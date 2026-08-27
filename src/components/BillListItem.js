@@ -1,21 +1,27 @@
 import React, { useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PAYMENT_TYPE_LABELS } from '../constants/paymentTypes';
+import {
+  PAYMENT_REFERENCE_LABELS,
+  PAYMENT_TYPE_LABELS,
+  PAYMENT_TYPES,
+} from '../constants/paymentTypes';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../constants/theme';
-import { isOnlinePayment, summariseBill } from '../utils/billing';
+import { hasPaymentReference, summariseBill } from '../utils/billing';
 import { formatDateTime } from '../utils/date';
 import { formatCurrency } from '../utils/money';
 import Card from './Card';
 
-const BillListItem = ({ bill, onViewTransaction }) => {
+const BillListItem = ({ bill, onViewTransaction, actions }) => {
   const { billTotal, amountPaid, unbalance } = useMemo(
     () => summariseBill(bill),
     [bill],
   );
 
-  const isOnline = isOnlinePayment(bill.payment_type);
-  const canViewTransaction = isOnline && Boolean(bill.transaction_screenshot_url);
+  const hasReference = hasPaymentReference(bill.payment_type);
+  const referenceLabels = PAYMENT_REFERENCE_LABELS[bill.payment_type];
+  const canViewTransaction =
+    hasReference && Boolean(bill.transaction_screenshot_url);
 
   const handlePress = useCallback(() => {
     if (canViewTransaction) onViewTransaction?.(bill);
@@ -38,8 +44,8 @@ const BillListItem = ({ bill, onViewTransaction }) => {
               Qty {bill.qty} · {formatDateTime(bill.created_at)}
             </Text>
           </View>
-          <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeCash]}>
-            <Text style={[styles.badgeText, isOnline ? styles.badgeTextOnline : styles.badgeTextCash]}>
+          <View style={[styles.badge, hasReference ? styles.badgeOnline : styles.badgeCash]}>
+            <Text style={[styles.badgeText, hasReference ? styles.badgeTextOnline : styles.badgeTextCash]}>
               {PAYMENT_TYPE_LABELS[bill.payment_type] ?? bill.payment_type}
             </Text>
           </View>
@@ -67,16 +73,23 @@ const BillListItem = ({ bill, onViewTransaction }) => {
           </View>
         </View>
 
-        {isOnline && (
+        {hasReference && (
           <View style={styles.transactionRow}>
             <Text style={styles.transactionNumber} numberOfLines={1}>
-              Ref: {bill.transaction_number || '—'}
+              {referenceLabels?.numberShort ?? 'Ref'}:{' '}
+              {bill.transaction_number || '—'}
             </Text>
             {canViewTransaction && (
-              <Text style={styles.viewLink}>View screenshot</Text>
+              <Text style={styles.viewLink}>
+                {bill.payment_type === PAYMENT_TYPES.CHEQUE
+                  ? 'View cheque'
+                  : 'View screenshot'}
+              </Text>
             )}
           </View>
         )}
+
+        {!!actions && <View style={styles.actions}>{actions}</View>}
       </Card>
     </Pressable>
   );
@@ -84,6 +97,12 @@ const BillListItem = ({ bill, onViewTransaction }) => {
 
 const styles = StyleSheet.create({
   card: { marginBottom: SPACING.sm },
+  actions: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
   pressed: { opacity: 0.75 },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
   headerText: { flex: 1, paddingRight: SPACING.sm },

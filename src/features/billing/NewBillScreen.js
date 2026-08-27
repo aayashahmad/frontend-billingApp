@@ -13,12 +13,18 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCreateBill } from '../../hooks/useCreateBill';
+import { useDocumentActions } from '../../hooks/useDocumentActions';
+import { useProfile } from '../../store/ProfileContext';
 import { formatCurrency } from '../../utils/money';
+import DocumentActions from '../printing/DocumentActions';
+import { buildBillReceiptHtml } from '../printing/documentTemplates';
 import BillForm from './BillForm';
 
 const NewBillScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { submitBill, submitting, error, clearError } = useCreateBill();
+  const { profile: owner, profileLoaded } = useProfile();
+  const receiptDocs = useDocumentActions();
   const [lastCreated, setLastCreated] = useState(null);
 
   const handleSubmitBill = useCallback(
@@ -67,6 +73,24 @@ const NewBillScreen = ({ navigation }) => {
               {formatCurrency(lastCreated.customer.total_unpaid)} of{' '}
               {formatCurrency(lastCreated.customer.total_amount)} billed.
             </Text>
+            <DocumentActions
+              compact
+              label={`bill-${lastCreated.bill.id}-${lastCreated.customer.name}`}
+              buildHtml={() =>
+                buildBillReceiptHtml({
+                  bill: lastCreated.bill,
+                  customer: lastCreated.customer,
+                  owner,
+                })
+              }
+              print={receiptDocs.print}
+              shareAsPdf={receiptDocs.shareAsPdf}
+              busy={receiptDocs.busy}
+              error={receiptDocs.error}
+              disabled={!profileLoaded}
+              style={styles.receiptDocs}
+            />
+
             <View style={styles.receiptActions}>
               <Button
                 title="View customer"
@@ -89,6 +113,7 @@ const NewBillScreen = ({ navigation }) => {
           onSubmitBill={handleSubmitBill}
           submitting={submitting}
           submitError={error}
+          onClearSubmitError={clearError}
         />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -114,7 +139,8 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: 2,
   },
-  receiptActions: { flexDirection: 'row', marginTop: SPACING.md },
+  receiptDocs: { marginTop: SPACING.md },
+  receiptActions: { flexDirection: 'row', marginTop: SPACING.sm },
   receiptAction: { flex: 1 },
   receiptGap: { width: SPACING.sm },
 });

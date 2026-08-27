@@ -2,11 +2,15 @@ import React from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { buildUploadUrl } from '../constants/config';
+import { getAuthHeaders } from '../services/api';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../constants/theme';
 
 /** Full-screen viewer for an online bill's transaction screenshot. */
 const TransactionImageModal = ({ bill, onClose }) => {
   const uri = buildUploadUrl(bill?.transaction_screenshot_url);
+  // Screenshots are behind an ownership check now, so the bearer token has
+  // to ride along — <Image> does its own fetch and skips axios entirely.
+  const headers = getAuthHeaders();
 
   return (
     <Modal
@@ -32,7 +36,7 @@ const TransactionImageModal = ({ bill, onClose }) => {
 
         {uri ? (
           <Image
-            source={{ uri }}
+            source={{ uri, headers }}
             style={styles.image}
             resizeMode="contain"
             accessibilityLabel="Transaction screenshot"
