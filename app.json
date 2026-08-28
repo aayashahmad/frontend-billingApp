@@ -1,24 +1,26 @@
 {
   "expo": {
     "name": "Billing",
-    "slug": "BillingAppTemp",
+    "slug": "billing-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aayashahmad.billingapp"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/logo.png"
       },
-      "package": "com.aayashahmad.billingapp",
-      "versionCode": 1
+      "package": "com.aayashahmad.billingapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,13 +29,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Billing to access your photos so you can attach proof of payment to a bill \u2014 a transaction screenshot or a photo of a cheque. Only the image you pick is used.",
+          "photosPermission": "Allow Billing to access your photos so you can attach proof of payment to a bill — a transaction screenshot or a photo of a cheque. Only the image you pick is used.",
           "cameraPermission": "Allow Billing to use the camera so you can photograph a cheque or capture proof of payment for a bill.",
           "microphonePermission": false
         }
       ],
       "expo-secure-store",
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "83cc75ff-9347-460c-aec1-87a503d0530a"
+      }
+    }
   }
 }
