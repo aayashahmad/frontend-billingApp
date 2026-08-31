@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 
+import BrandedLoading from '../components/BrandedLoading';
 import Button from '../components/Button';
 import StateView from '../components/StateView';
 import { COLORS, FONT_SIZES } from '../constants/theme';
@@ -274,7 +275,7 @@ const RootRoute = () => {
         </View>
       );
     }
-    return <StateView variant="loading" style={styles.splash} />;
+    return <BrandedLoading message="Getting your shop ready…" />;
   }
 
   return needsOnboarding ? <OnboardingNavigator /> : <MainDrawer />;
@@ -283,10 +284,10 @@ const RootRoute = () => {
 const AppNavigator = () => {
   const { restoring } = useAuth();
 
-  // Hold on a splash until the keychain read settles, otherwise a returning
-  // user sees the login screen flash before their session is restored.
+  // Belt and braces: App.js already holds the splash until the keychain read
+  // settles, so this only matters if that gate is ever bypassed.
   if (restoring) {
-    return <StateView variant="loading" style={styles.splash} />;
+    return <BrandedLoading />;
   }
 
   return (

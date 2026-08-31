@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 
 // Use the generated logo asset.
-const logo = require('../../assets/logo.png');
+// The mark alone — logo.png's dark tile is cropped out in logo-mark.png.
+const logo = require('../../assets/logo-mark.png');
 
 /**
  * Full-screen splash shown once on cold start.
@@ -26,7 +27,7 @@ const logo = require('../../assets/logo.png');
  *  360ms – 700ms  Wordmark and tagline fade in and rise.
  *  1200ms         Whole screen fades out, then `onFinish` is called.
  */
-const AnimatedSplash = ({ onFinish }) => {
+const AnimatedSplash = ({ onFinish, onLayout }) => {
   // The splash is absolutely positioned, so it cannot inherit a height from
   // its parent — measure the window instead. Without this it collapses to
   // whatever the provider tree happens to lay out.
@@ -87,6 +88,7 @@ const AnimatedSplash = ({ onFinish }) => {
 
   return (
     <Animated.View
+      onLayout={onLayout}
       style={[styles.container, { width, height, opacity: screenOpacity }]}
     >
       <View style={styles.center}>
@@ -139,8 +141,6 @@ const styles = StyleSheet.create({
   logoBox: {
     width: 96,
     height: 96,
-    borderRadius: 22,
-    overflow: 'hidden',
     marginBottom: 28,
   },
   logo: {

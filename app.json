@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aayashahmad.billingapp"
@@ -20,12 +15,22 @@
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/logo.png"
       },
-      "package": "com.aayashahmad.billingapp"
+      "package": "com.aayashahmad.billingapp",
+      "backgroundColor": "#0F172A"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo.png",
+          "backgroundColor": "#0F172A",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -49,6 +54,7 @@
       "eas": {
         "projectId": "83cc75ff-9347-460c-aec1-87a503d0530a"
       }
-    }
+    },
+    "backgroundColor": "#0F172A"
   }
 }

@@ -26,28 +26,38 @@ const AuthScreenLayout = ({
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // The app runs edge-to-edge on Android, so `adjustResize` no longer
+      // shrinks the window and the default (undefined) behaviour left the
+      // password and button sitting under the keyboard. `padding` works on
+      // both platforms.
+      behavior="padding"
     >
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + SPACING.xl, paddingBottom: insets.bottom + SPACING.xl },
+          {
+            paddingTop: insets.top + SPACING.xl,
+            paddingBottom: insets.bottom + SPACING.xl,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
-        <View style={styles.header}>
-          <Text style={styles.brand}>Billing</Text>
-          <Text style={styles.title}>{title}</Text>
-          {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
+        <View style={styles.centred}>
+          <View style={styles.header}>
+            <Text style={styles.brand}>Billing</Text>
+            <Text style={styles.title}>{title}</Text>
+            {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
 
-        <Card>{children}</Card>
+          <Card>{children}</Card>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerPrompt}>{footerPrompt}</Text>
-          <Pressable onPress={onFooterPress} accessibilityRole="button">
-            <Text style={styles.footerAction}>{footerAction}</Text>
-          </Pressable>
+          <View style={styles.footer}>
+            <Text style={styles.footerPrompt}>{footerPrompt}</Text>
+            <Pressable onPress={onFooterPress} accessibilityRole="button">
+              <Text style={styles.footerAction}>{footerAction}</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -56,7 +66,13 @@ const AuthScreenLayout = ({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.md, flexGrow: 1, justifyContent: 'center' },
+  // `justifyContent: 'center'` is deliberately absent: once the keyboard
+  // shrinks the viewport the content is taller than the container, and a
+  // centred content container overflows equally top and bottom — leaving the
+  // top unreachable however far you scroll. `marginTop: auto` on the first
+  // child centres it only while it actually fits.
+  content: { padding: SPACING.md, flexGrow: 1 },
+  centred: { marginTop: 'auto', marginBottom: 'auto', width: '100%' },
   header: { marginBottom: SPACING.lg, alignItems: 'center' },
   brand: {
     fontSize: FONT_SIZES.sm,
