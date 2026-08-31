@@ -39,6 +39,25 @@ const onlineBill = {
   created_at: '2026-08-25T11:00:00',
 };
 
+/** Three lines on one bill, as the API returns them post-migration. */
+const multiItemBill = {
+  id: 9,
+  // The flat columns mirror the first line, exactly as the API writes them.
+  item_name: 'Cement bag',
+  qty: 10,
+  rate: 400,
+  bill_total: 4950,
+  payment_type: PAYMENT_TYPES.CASH,
+  amount_paid: 1000,
+  unbalance: 3950,
+  created_at: '2026-08-25T12:00:00',
+  items: [
+    { id: 1, item_name: 'Cement bag', qty: 10, rate: 400, line_total: 4000, position: 0 },
+    { id: 2, item_name: 'Steel rod', qty: 2, rate: 250, line_total: 500, position: 1 },
+    { id: 3, item_name: 'Paint tin', qty: 3, rate: 150, line_total: 450, position: 2 },
+  ],
+};
+
 const business = {
   username: 'Demo Shop',
   email: 'demo@shop.com',
@@ -229,5 +248,55 @@ describe('buildCustomerStatementHtml', () => {
     });
     expect(html).not.toContain('<b>x</b>');
     expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
+
+describe('multi-item bills', () => {
+  it('prints a receipt row for every line, with its qty and rate', () => {
+    const html = buildBillReceiptHtml({
+      bill: multiItemBill,
+      customer,
+      owner,
+    });
+
+    for (const name of ['Cement bag', 'Steel rod', 'Paint tin']) {
+      expect(html).toContain(name);
+    }
+    // Each line's own rate and amount, not just the bill total.
+    expect(html).toContain('₹250.00');
+    expect(html).toContain('₹450.00');
+    expect(html).toContain('₹4,950.00');
+  });
+
+  it('falls back to the flat columns for a bill written before line items', () => {
+    const html = buildBillReceiptHtml({ bill: cashBill, customer, owner });
+    expect(html).toContain('Cement bag');
+    expect(html).toContain('₹1,000.00');
+  });
+
+  it('breaks every line out in the statement with its qty and rate', () => {
+    const html = buildCustomerStatementHtml({
+      customer,
+      bills: [multiItemBill],
+      owner,
+      issuedAt: 'Aug 25, 2026',
+    });
+
+    for (const name of ['Cement bag', 'Steel rod', 'Paint tin']) {
+      expect(html).toContain(name);
+    }
+    expect(html).toContain('2 × ₹250.00 = ₹500.00');
+    expect(html).toContain('3 × ₹150.00 = ₹450.00');
+  });
+
+  it('sums the quantity column across the lines', () => {
+    const html = buildCustomerStatementHtml({
+      customer,
+      bills: [multiItemBill],
+      owner,
+      issuedAt: 'Aug 25, 2026',
+    });
+    // 10 + 2 + 3
+    expect(html).toContain('>15</td>');
   });
 });

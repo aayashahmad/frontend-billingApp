@@ -17,6 +17,7 @@ import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import ProductsScreen from '../screens/ProductsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchScreen from '../screens/SearchScreen';
 import SignupScreen from '../screens/SignupScreen';
@@ -30,6 +31,7 @@ const AuthStack = createNativeStackNavigator();
 const NewBillStack = createNativeStackNavigator();
 const CustomersStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
+const ProductsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const BusinessStack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
@@ -116,6 +118,16 @@ const BusinessNavigator = () => (
   </BusinessStack.Navigator>
 );
 
+const ProductsNavigator = () => (
+  <ProductsStack.Navigator screenOptions={stackScreenOptions}>
+    <ProductsStack.Screen
+      name="Products"
+      component={ProductsScreen}
+      options={rootScreenOptions('Products')}
+    />
+  </ProductsStack.Navigator>
+);
+
 const LegalNavigator = () => (
   <LegalStack.Navigator screenOptions={stackScreenOptions}>
     <LegalStack.Screen
@@ -152,6 +164,14 @@ const ProfileNavigator = () => (
   </ProfileStack.Navigator>
 );
 
+/**
+ * Drawer destinations live in here too, as tabs without a button, so the tab
+ * bar stays on screen wherever the user is — previously My Customers, Bill
+ * Details, My Profile and Privacy Policy sat outside the tab navigator and
+ * lost the bottom navigation entirely.
+ */
+const hiddenTab = { tabBarItemStyle: { display: 'none' }, tabBarButton: () => null };
+
 const MainTabs = () => (
   <Tab.Navigator
     screenOptions={{
@@ -171,12 +191,39 @@ const MainTabs = () => (
       component={CustomersNavigator}
       options={{ title: 'Search', tabBarIcon: icon('search-outline') }}
     />
+    <Tab.Screen
+      name="MyCustomersRoot"
+      component={MyCustomersNavigator}
+      options={{ title: 'My Customers', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="BusinessProfileRoot"
+      component={BusinessNavigator}
+      options={{ title: 'Bill Details', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="ProductsRoot"
+      component={ProductsNavigator}
+      options={{ title: 'Products', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="Profile"
+      component={ProfileNavigator}
+      options={{ title: 'My Profile', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="PrivacyPolicyRoot"
+      component={LegalNavigator}
+      options={{ title: 'Privacy Policy', ...hiddenTab }}
+    />
   </Tab.Navigator>
 );
 
 /**
- * The drawer wraps everything, so the hamburger is reachable from any root
- * screen. Its own header is off — each stack renders its own.
+ * The drawer wraps the tab tree, so the hamburger is reachable from any root
+ * screen. Its own header is off — each stack renders its own. Every
+ * destination is a tab route now, so DrawerContent lists them explicitly
+ * rather than through DrawerItemList.
  */
 const MainDrawer = () => (
   <Drawer.Navigator
@@ -187,34 +234,7 @@ const MainDrawer = () => (
       drawerInactiveTintColor: COLORS.textLight,
     }}
   >
-    <Drawer.Screen
-      name="Billing"
-      component={MainTabs}
-      options={{ title: 'Billing', drawerIcon: icon('receipt-outline') }}
-    />
-    <Drawer.Screen
-      name="MyCustomersRoot"
-      component={MyCustomersNavigator}
-      options={{ title: 'My Customers', drawerIcon: icon('people-outline') }}
-    />
-    <Drawer.Screen
-      name="BusinessProfileRoot"
-      component={BusinessNavigator}
-      options={{ title: 'Bill Details', drawerIcon: icon('document-text-outline') }}
-    />
-    <Drawer.Screen
-      name="Profile"
-      component={ProfileNavigator}
-      options={{ title: 'My Profile', drawerIcon: icon('person-circle-outline') }}
-    />
-    <Drawer.Screen
-      name="PrivacyPolicyRoot"
-      component={LegalNavigator}
-      options={{
-        title: 'Privacy Policy',
-        drawerIcon: icon('shield-checkmark-outline'),
-      }}
-    />
+    <Drawer.Screen name="Billing" component={MainTabs} />
   </Drawer.Navigator>
 );
 

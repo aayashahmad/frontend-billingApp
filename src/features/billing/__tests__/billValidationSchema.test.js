@@ -9,9 +9,7 @@ const validCashBill = {
   ...INITIAL_BILL_VALUES,
   phone: '9876543210',
   customerName: 'Asha Traders',
-  itemName: 'Cement bag',
-  qty: '10',
-  rate: '400',
+  items: [{ itemName: 'Cement bag', qty: '10', rate: '400' }],
   paymentType: PAYMENT_TYPES.CASH,
   amountPaid: '2000',
 };
@@ -20,9 +18,7 @@ const validOnlineBill = {
   ...INITIAL_BILL_VALUES,
   phone: '9876543210',
   customerName: 'Asha Traders',
-  itemName: 'Cement bag',
-  qty: '2',
-  rate: '400',
+  items: [{ itemName: 'Cement bag', qty: '2', rate: '400' }],
   paymentType: PAYMENT_TYPES.ONLINE,
   transactionNumber: 'UTR123456',
   transactionScreenshot: { uri: 'file:///tmp/txn.jpg', mimeType: 'image/jpeg' },
@@ -53,9 +49,9 @@ describe('billValidationSchema — shared fields', () => {
       expect.arrayContaining([
         'phone',
         'customerName',
-        'itemName',
-        'qty',
-        'rate',
+        'items[0].itemName',
+        'items[0].qty',
+        'items[0].rate',
         'amountPaid',
       ]),
     );
@@ -71,8 +67,48 @@ describe('billValidationSchema — shared fields', () => {
   });
 
   it('requires an item name', async () => {
-    const paths = await errorPaths({ ...validCashBill, itemName: '   ' });
-    expect(paths).toContain('itemName');
+    const paths = await errorPaths({
+      ...validCashBill,
+      items: [{ itemName: '   ', qty: '10', rate: '400' }],
+    });
+    expect(paths).toContain('items[0].itemName');
+  });
+
+  it('requires at least one item', async () => {
+    const paths = await errorPaths({ ...validCashBill, items: [] });
+    expect(paths).toContain('items');
+  });
+
+  it('validates every item, not just the first', async () => {
+    const paths = await errorPaths({
+      ...validCashBill,
+      items: [
+        { itemName: 'Cement bag', qty: '10', rate: '400' },
+        { itemName: '', qty: '0', rate: '' },
+      ],
+      amountPaid: '0',
+    });
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        'items[1].itemName',
+        'items[1].qty',
+        'items[1].rate',
+      ]),
+    );
+  });
+
+  it('accepts a bill with several valid items', async () => {
+    await expect(
+      errorPaths({
+        ...validCashBill,
+        items: [
+          { itemName: 'Cement bag', qty: '10', rate: '400' },
+          { itemName: 'Steel rod', qty: '2', rate: '250' },
+        ],
+        // 10x400 + 2x250 = 4500
+        amountPaid: '4500',
+      }),
+    ).resolves.toEqual([]);
   });
 
   it.each([
@@ -81,8 +117,12 @@ describe('billValidationSchema — shared fields', () => {
     ['fractional', '1.5'],
     ['blank', ''],
   ])('rejects a %s quantity', async (_label, qty) => {
-    const paths = await errorPaths({ ...validCashBill, qty, amountPaid: '0' });
-    expect(paths).toContain('qty');
+    const paths = await errorPaths({
+      ...validCashBill,
+      items: [{ itemName: 'Cement bag', qty, rate: '400' }],
+      amountPaid: '0',
+    });
+    expect(paths).toContain('items[0].qty');
   });
 
   it('rejects an unknown payment type', async () => {
@@ -114,7 +154,7 @@ describe('billValidationSchema — cash bills', () => {
   });
 
   it('rejects a payment larger than the bill total', async () => {
-    // qty 10 × rate 400 = 4000
+    // qty 10 × rate 400 = 4000, summed across the item list
     const paths = await errorPaths({ ...validCashBill, amountPaid: '4001' });
     expect(paths).toContain('amountPaid');
   });
@@ -188,9 +228,7 @@ describe('cheque payments', () => {
   const chequeBill = {
     phone: '9876543210',
     customerName: 'Asha Traders',
-    itemName: 'Cement',
-    qty: '2',
-    rate: '500',
+    items: [{ itemName: 'Cement', qty: '2', rate: '500' }],
     paymentType: PAYMENT_TYPES.CHEQUE,
     amountPaid: '600',
     transactionNumber: 'CHQ-100234',

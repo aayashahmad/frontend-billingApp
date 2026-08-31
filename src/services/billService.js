@@ -20,9 +20,7 @@ const inferMimeType = (asset) => {
 const buildBillFormData = ({
   phone,
   customerName,
-  itemName,
-  qty,
-  rate,
+  items = [],
   paymentType,
   amountPaid,
   transactionNumber,
@@ -31,9 +29,25 @@ const buildBillFormData = ({
   const formData = new FormData();
   formData.append('phone', String(phone).trim());
   formData.append('customer_name', String(customerName || '').trim());
-  formData.append('item_name', String(itemName).trim());
-  formData.append('qty', String(qty));
-  formData.append('rate', String(rate));
+
+  const lines = items.map((item) => ({
+    item_name: String(item?.itemName ?? '').trim(),
+    qty: Number(item?.qty),
+    rate: Number(item?.rate),
+  }));
+
+  formData.append('items', JSON.stringify(lines));
+
+  // The flat fields carry the first line as well. The API still accepts them
+  // on their own, so leaving them in place keeps the request valid against a
+  // server that predates multi-item bills.
+  const [first] = lines;
+  if (first) {
+    formData.append('item_name', first.item_name);
+    formData.append('qty', String(first.qty));
+    formData.append('rate', String(first.rate));
+  }
+
   formData.append('payment_type', paymentType);
 
   // Keyed off the shared predicates rather than a specific payment type, so

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import BillDetailModal from '../../components/BillDetailModal';
 import BillListItem from '../../components/BillListItem';
 import CustomerSummaryCard from '../../components/CustomerSummaryCard';
 import StateView from '../../components/StateView';
@@ -24,6 +25,9 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   const { customer, loading, refreshing, error, refresh } =
     useCustomerDetail(customerId);
   const { profile: owner, profileLoaded } = useProfile();
+  // Two separate selections: opening the payment image from inside the detail
+  // sheet must not close the sheet underneath it.
+  const [detailBill, setDetailBill] = useState(null);
   const [selectedBill, setSelectedBill] = useState(null);
 
   // Separate action states so a per-bill failure never reports itself under
@@ -45,6 +49,8 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     [bills],
   );
 
+  const handleOpenBill = useCallback((bill) => setDetailBill(bill), []);
+  const handleCloseBill = useCallback(() => setDetailBill(null), []);
   const handleViewTransaction = useCallback((bill) => setSelectedBill(bill), []);
   const handleCloseTransaction = useCallback(() => setSelectedBill(null), []);
 
@@ -63,6 +69,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     ({ item }) => (
       <BillListItem
         bill={item}
+        onPress={handleOpenBill}
         onViewTransaction={handleViewTransaction}
         actions={
           <DocumentActions
@@ -84,6 +91,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
       billDocs.print,
       billDocs.shareAsPdf,
       customer,
+      handleOpenBill,
       handleViewTransaction,
       owner,
       profileLoaded,
@@ -179,6 +187,12 @@ const CustomerDetailScreen = ({ route, navigation }) => {
             style={styles.emptyState}
           />
         }
+      />
+
+      <BillDetailModal
+        bill={detailBill}
+        onClose={handleCloseBill}
+        onViewTransaction={handleViewTransaction}
       />
 
       <TransactionImageModal

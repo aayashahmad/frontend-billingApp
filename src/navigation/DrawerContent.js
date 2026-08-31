@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
   DrawerContentScrollView,
-  DrawerItemList,
+  DrawerItem,
 } from '@react-navigation/drawer';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { useAuth } from '../store/AuthContext';
 import { useProfile } from '../store/ProfileContext';
+
+/**
+ * Drawer destinations, in order. Each one is a route on the tab navigator
+ * nested under the drawer's single `Billing` screen — that nesting is what
+ * keeps the bottom tab bar on screen everywhere.
+ */
+const DRAWER_ITEMS = [
+  { route: 'NewBillTab', label: 'Billing', icon: 'receipt-outline' },
+  { route: 'MyCustomersRoot', label: 'My Customers', icon: 'people-outline' },
+  { route: 'ProductsRoot', label: 'Products', icon: 'pricetags-outline' },
+  {
+    route: 'BusinessProfileRoot',
+    label: 'Bill Details',
+    icon: 'document-text-outline',
+  },
+  { route: 'Profile', label: 'My Profile', icon: 'person-circle-outline' },
+  {
+    route: 'PrivacyPolicyRoot',
+    label: 'Privacy Policy',
+    icon: 'shield-checkmark-outline',
+  },
+];
+
+/** Name of the tab route currently showing, for the active highlight. */
+const activeTabRoute = (state) => {
+  const nested = state?.routes?.[state.index]?.state;
+  if (!nested?.routes?.length) return DRAWER_ITEMS[0].route;
+  return nested.routes[nested.index ?? 0]?.name ?? DRAWER_ITEMS[0].route;
+};
 
 const initialsOf = (name) =>
   String(name || '?')
@@ -25,7 +54,14 @@ const DrawerContent = (props) => {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const openProfile = () => props.navigation.navigate('Profile');
+  const active = activeTabRoute(props.state);
+
+  const go = (route) => {
+    props.navigation.navigate('Billing', { screen: route });
+    props.navigation.closeDrawer();
+  };
+
+  const openProfile = () => go('Profile');
 
   return (
     <View style={styles.container}>
@@ -70,7 +106,19 @@ const DrawerContent = (props) => {
         </View>
 
         <View style={styles.items}>
-          <DrawerItemList {...props} />
+          {DRAWER_ITEMS.map((item) => (
+            <DrawerItem
+              key={item.route}
+              label={item.label}
+              focused={active === item.route}
+              activeTintColor={COLORS.primary}
+              inactiveTintColor={COLORS.textLight}
+              icon={({ color, size }) => (
+                <Ionicons name={item.icon} size={size} color={color} />
+              )}
+              onPress={() => go(item.route)}
+            />
+          ))}
         </View>
       </DrawerContentScrollView>
 

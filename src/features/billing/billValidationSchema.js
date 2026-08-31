@@ -5,7 +5,11 @@ import {
   PHONE_MAX_LENGTH,
   PHONE_MIN_LENGTH,
 } from '../../constants/paymentTypes';
-import { calculateBillTotal, hasPaymentReference, usesEnteredAmount } from '../../utils/billing';
+import {
+  calculateItemsTotal,
+  hasPaymentReference,
+  usesEnteredAmount,
+} from '../../utils/billing';
 
 /** Yup coerces '' to NaN for number fields; map it to undefined instead. */
 const emptyStringToUndefined = (value, originalValue) =>
@@ -24,20 +28,29 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
 
     customerName: Yup.string().trim().required('Customer name is required'),
 
-    itemName: Yup.string().trim().required('Item name is required'),
+    // One bill can carry several lines. Every line is validated the same way
+    // the single item used to be.
+    items: Yup.array()
+      .of(
+        Yup.object({
+          itemName: Yup.string().trim().required('Item name is required'),
 
-    qty: Yup.number()
-      .transform(emptyStringToUndefined)
-      .typeError('Quantity must be a number')
-      .required('Quantity is required')
-      .integer('Quantity must be a whole number')
-      .moreThan(0, 'Quantity must be greater than 0'),
+          qty: Yup.number()
+            .transform(emptyStringToUndefined)
+            .typeError('Quantity must be a number')
+            .required('Quantity is required')
+            .integer('Quantity must be a whole number')
+            .moreThan(0, 'Quantity must be greater than 0'),
 
-    rate: Yup.number()
-      .transform(emptyStringToUndefined)
-      .typeError('Rate must be a number')
-      .required('Rate is required')
-      .moreThan(0, 'Rate must be greater than 0'),
+          rate: Yup.number()
+            .transform(emptyStringToUndefined)
+            .typeError('Rate must be a number')
+            .required('Rate is required')
+            .moreThan(0, 'Rate must be greater than 0'),
+        }),
+      )
+      .min(1, 'Add at least one item')
+      .required('Add at least one item'),
 
     paymentType: Yup.string()
       .required('Payment type is required')
@@ -58,9 +71,8 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
               'Amount paid cannot exceed the bill total',
               function validateAgainstTotal(value) {
                 if (allowOverpayment || value === undefined) return true;
-                const { qty, rate } = this.parent;
-                const billTotal = calculateBillTotal(qty, rate);
-                // Skip until qty/rate are themselves valid — their own rules
+                const billTotal = calculateItemsTotal(this.parent.items);
+                // Skip until the lines are themselves valid — their own rules
                 // will surface the error rather than this one.
                 if (billTotal <= 0) return true;
                 return value <= billTotal;
@@ -98,12 +110,21 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
 
 export const billValidationSchema = createBillValidationSchema();
 
-export const INITIAL_BILL_VALUES = Object.freeze({
-  phone: '',
-  customerName: '',
+/** A blank line item — also what the "Add item" button appends. */
+export const createEmptyItem = () => ({
   itemName: '',
   qty: '',
   rate: '',
+  // Set when the line was scanned. `isNewProduct` marks a barcode the
+  // catalogue did not know, which is what the form saves after the sale.
+  barcode: '',
+  isNewProduct: false,
+});
+
+export const INITIAL_BILL_VALUES = Object.freeze({
+  phone: '',
+  customerName: '',
+  items: [createEmptyItem()],
   paymentType: PAYMENT_TYPES.CASH,
   amountPaid: '',
   transactionNumber: '',

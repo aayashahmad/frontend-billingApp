@@ -1,6 +1,8 @@
 import {
   aggregateBillTotals,
+  billItems,
   calculateBillTotal,
+  calculateItemsTotal,
   calculateUnbalance,
 } from '../billing';
 import { PAYMENT_TYPES } from '../../constants/paymentTypes';
@@ -81,5 +83,50 @@ describe('aggregateBillTotals', () => {
       totalAmount: 1000,
       totalUnpaid: 150,
     });
+  });
+});
+
+describe('calculateItemsTotal', () => {
+  it('sums every line', () => {
+    expect(
+      calculateItemsTotal([
+        { qty: '10', rate: '400' },
+        { qty: '2', rate: '250' },
+      ]),
+    ).toBe(4500);
+  });
+
+  it('rounds to currency precision', () => {
+    expect(calculateItemsTotal([{ qty: '3', rate: '10.335' }])).toBe(31.01);
+  });
+
+  it('treats a missing or empty list as zero', () => {
+    expect(calculateItemsTotal(undefined)).toBe(0);
+    expect(calculateItemsTotal([])).toBe(0);
+  });
+});
+
+describe('billItems', () => {
+  it('returns the line items when the bill has them', () => {
+    const items = [{ id: 7, item_name: 'Cement', qty: 2, rate: 500, line_total: 1000 }];
+    expect(billItems({ id: 1, items })).toBe(items);
+  });
+
+  it('synthesises a line from the flat columns of a pre-multi-item bill', () => {
+    expect(billItems({ id: 4, item_name: 'Cement', qty: 2, rate: 500 })).toEqual([
+      {
+        id: '4-0',
+        item_name: 'Cement',
+        qty: 2,
+        rate: 500,
+        line_total: 1000,
+        position: 0,
+      },
+    ]);
+  });
+
+  it('returns nothing for a bill with neither', () => {
+    expect(billItems({ id: 9 })).toEqual([]);
+    expect(billItems(null)).toEqual([]);
   });
 });

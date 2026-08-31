@@ -5,6 +5,8 @@ import {
 } from '../../constants/paymentTypes';
 import {
   aggregateBillTotals,
+  billItems,
+  calculateBillTotal,
   hasPaymentReference,
   summariseBill,
 } from '../../utils/billing';
@@ -71,6 +73,17 @@ const BASE_STYLES = `
   }
   td { padding: 8px 6px; border-bottom: 1px solid #F1F5F9; }
   .num { text-align: right; white-space: nowrap; }
+  tfoot td {
+    border-top: 1px solid #0F172A;
+    border-bottom: none;
+    font-weight: 700;
+  }
+  tfoot .label { color: #64748B; text-align: right; }
+  /* Each line of a multi-item bill, inside the statement's Item cell. */
+  .line { margin-bottom: 2px; }
+  .line:last-child { margin-bottom: 0; }
+  .line-name { display: block; }
+  .line-meta { display: block; color: #64748B; font-size: 10px; }
   .totals { margin-top: 20px; margin-left: auto; width: 260px; }
   .totals tr td { border: none; padding: 5px 6px; }
   .totals .label { color: #64748B; }
@@ -215,13 +228,26 @@ export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
         </tr>
       </thead>
       <tbody>
+        ${billItems(bill)
+          .map(
+            (item) => `
         <tr>
-          <td>${escapeHtml(bill?.item_name)}</td>
-          <td class="num">${escapeHtml(bill?.qty)}</td>
-          <td class="num">${formatCurrency(bill?.rate)}</td>
+          <td>${escapeHtml(item.item_name)}</td>
+          <td class="num">${escapeHtml(item.qty)}</td>
+          <td class="num">${formatCurrency(item.rate)}</td>
+          <td class="num">${formatCurrency(
+            item.line_total ?? calculateBillTotal(item.qty, item.rate),
+          )}</td>
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" class="label">Total</td>
           <td class="num">${formatCurrency(billTotal)}</td>
         </tr>
-      </tbody>
+      </tfoot>
     </table>
 
     <table class="totals">
@@ -261,8 +287,25 @@ export const buildCustomerStatementHtml = ({ customer, bills = [], owner, issued
           return `
             <tr>
               <td>${escapeHtml(formatDateTime(bill.created_at))}</td>
-              <td>${escapeHtml(bill.item_name)}</td>
-              <td class="num">${escapeHtml(bill.qty)}</td>
+              <td>${billItems(bill)
+                .map(
+                  (item) => `
+                <div class="line">
+                  <span class="line-name">${escapeHtml(item.item_name)}</span>
+                  <span class="line-meta">${escapeHtml(item.qty)} × ${formatCurrency(
+                    item.rate,
+                  )} = ${formatCurrency(
+                    item.line_total ?? calculateBillTotal(item.qty, item.rate),
+                  )}</span>
+                </div>`,
+                )
+                .join('')}</td>
+              <td class="num">${escapeHtml(
+                billItems(bill).reduce(
+                  (sum, item) => sum + Number(item.qty || 0),
+                  0,
+                ),
+              )}</td>
               <td>${paymentBadge(bill.payment_type)}</td>
               <td class="num">${formatCurrency(billTotal)}</td>
               <td class="num">${formatCurrency(amountPaid)}</td>

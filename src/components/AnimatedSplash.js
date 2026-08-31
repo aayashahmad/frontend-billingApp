@@ -6,7 +6,9 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../constants/theme';
 
@@ -14,254 +16,162 @@ import { COLORS } from '../constants/theme';
 const logo = require('../../assets/logo.png');
 
 /**
- * Full-screen animated splash shown once on cold start.
+ * Full-screen splash shown once on cold start.
  *
- * Animation sequence (all use the built-in Animated API so there are no
- * extra native-module requirements):
+ * Deliberately restrained — one flat background, one gentle fade-and-settle
+ * for the mark, then the wordmark. Built on the standard Animated API so
+ * there is no extra native-module requirement.
  *
- *  0ms – 600ms   Logo scales up from 0 → 1 with a spring overshoot.
- *  400ms – 800ms App title fades in and slides up.
- *  700ms – 1100ms Tagline fades in and slides up.
- *  After 2.2s     Entire screen fades out, then `onFinish` is called.
+ *  0ms – 500ms    Logo fades in and settles from 92% to full size.
+ *  360ms – 700ms  Wordmark and tagline fade in and rise.
+ *  1200ms         Whole screen fades out, then `onFinish` is called.
  */
 const AnimatedSplash = ({ onFinish }) => {
-  // ── Animated values ──────────────────────────────────────────────────
-  const logoScale = useRef(new Animated.Value(0)).current;
-  const logoRotation = useRef(new Animated.Value(0)).current;
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const titleTranslateY = useRef(new Animated.Value(20)).current;
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const taglineTranslateY = useRef(new Animated.Value(20)).current;
+  // The splash is absolutely positioned, so it cannot inherit a height from
+  // its parent — measure the window instead. Without this it collapses to
+  // whatever the provider tree happens to lay out.
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.92)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslateY = useRef(new Animated.Value(12)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
-  // Pulsing glow behind the logo (loops until the splash fades out).
-  const pulseScale = useRef(new Animated.Value(0.8)).current;
-  const pulseOpacity = useRef(new Animated.Value(0.3)).current;
-
   useEffect(() => {
-    // Looping pulse (background glow ring).
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(pulseScale, {
-            toValue: 1.35,
-            duration: 1200,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseOpacity, {
-            toValue: 0,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ]),
-        // Reset.
-        Animated.parallel([
-          Animated.timing(pulseScale, {
-            toValue: 0.8,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseOpacity, {
-            toValue: 0.3,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-    );
-    pulse.start();
-
-    // Main entrance sequence.
     Animated.sequence([
-      // 1) Logo pops in with spring + slight rotation.
+      // 1) The mark settles into place.
       Animated.parallel([
-        Animated.spring(logoScale, {
+        Animated.timing(logoOpacity, {
           toValue: 1,
-          friction: 5,
-          tension: 70,
+          duration: 500,
+          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.timing(logoRotation, {
+        Animated.timing(logoScale, {
           toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.back(1.3)),
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]),
 
-      // Small pause so the logo settles.
-      Animated.delay(100),
-
-      // 2) Title slides up.
+      // 2) Wordmark and tagline follow as one block.
       Animated.parallel([
-        Animated.timing(titleOpacity, {
+        Animated.timing(textOpacity, {
           toValue: 1,
-          duration: 400,
+          duration: 340,
+          easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.timing(titleTranslateY, {
+        Animated.timing(textTranslateY, {
           toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
+          duration: 340,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]),
 
-      // 3) Tagline slides up.
-      Animated.parallel([
-        Animated.timing(taglineOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(taglineTranslateY, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
+      // 3) Hold briefly, then hand over to the app.
+      Animated.delay(450),
 
-      // 4) Hold for a beat …
-      Animated.delay(800),
-
-      // 5) Fade out the whole splash.
       Animated.timing(screenOpacity, {
         toValue: 0,
-        duration: 400,
+        duration: 280,
+        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      pulse.stop();
-      onFinish?.();
-    });
+    ]).start(() => onFinish?.());
   }, []);
 
-  const spin = logoRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-15deg', '0deg'],
-  });
-
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-      {/* Gradient-ish background built from layered Views */}
-      <View style={styles.bgTop} />
-      <View style={styles.bgBottom} />
+    <Animated.View
+      style={[styles.container, { width, height, opacity: screenOpacity }]}
+    >
+      <View style={styles.center}>
+        <Animated.View
+          style={[
+            styles.logoBox,
+            { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+          ]}
+        >
+          <Image source={logo} style={styles.logo} resizeMode="contain" />
+        </Animated.View>
 
-      {/* Pulsing glow ring */}
-      <Animated.View
-        style={[
-          styles.pulse,
-          { transform: [{ scale: pulseScale }], opacity: pulseOpacity },
-        ]}
-      />
-
-      {/* Logo */}
-      <Animated.View
-        style={[
-          styles.logoBox,
-          { transform: [{ scale: logoScale }, { rotate: spin }] },
-        ]}
-      >
-        <Image source={logo} style={styles.logo} />
-      </Animated.View>
-
-      {/* Title */}
-      <Animated.Text
-        style={[
-          styles.title,
-          {
-            opacity: titleOpacity,
-            transform: [{ translateY: titleTranslateY }],
-          },
-        ]}
-      >
-        Billing
-      </Animated.Text>
-
-      {/* Tagline */}
-      <Animated.Text
-        style={[
-          styles.tagline,
-          {
-            opacity: taglineOpacity,
-            transform: [{ translateY: taglineTranslateY }],
-          },
-        ]}
-      >
-        Smart invoicing for your business
-      </Animated.Text>
-
-      {/* Subtle footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>by Aayash Ahmad</Text>
+        <Animated.View
+          style={{
+            opacity: textOpacity,
+            transform: [{ translateY: textTranslateY }],
+          }}
+        >
+          <Text style={styles.title}>Billing</Text>
+          <View style={styles.rule} />
+          <Text style={styles.tagline}>Smart invoicing for your business</Text>
+        </Animated.View>
       </View>
+
+      <Animated.Text
+        style={[
+          styles.footerText,
+          { opacity: textOpacity, bottom: insets.bottom + 24 },
+        ]}
+      >
+        by Aayash Ahmad
+      </Animated.Text>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: '#0F172A',
     zIndex: 999,
   },
-  bgTop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0F172A',
-  },
-  bgBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: '#1E293B',
-    borderTopLeftRadius: 48,
-    borderTopRightRadius: 48,
-  },
-  pulse: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: COLORS.primary,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logoBox: {
-    width: 120,
-    height: 120,
-    borderRadius: 28,
+    width: 96,
+    height: 96,
+    borderRadius: 22,
     overflow: 'hidden',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 16,
+    marginBottom: 28,
   },
   logo: {
     width: '100%',
     height: '100%',
   },
   title: {
-    marginTop: 28,
-    fontSize: 36,
-    fontWeight: '800',
+    fontSize: 30,
+    fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  rule: {
+    alignSelf: 'center',
+    width: 32,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: COLORS.primary,
+    marginVertical: 14,
   },
   tagline: {
-    marginTop: 8,
-    fontSize: 15,
+    fontSize: 14,
     color: '#94A3B8',
-    letterSpacing: 0.5,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 48,
+    textAlign: 'center',
   },
   footerText: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
     fontSize: 12,
     color: '#475569',
   },

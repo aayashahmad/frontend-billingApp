@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +15,7 @@ import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCreateBill } from '../../hooks/useCreateBill';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
+import { billItems, calculateBillTotal } from '../../utils/billing';
 import { formatCurrency } from '../../utils/money';
 import DocumentActions from '../printing/DocumentActions';
 import { buildBillReceiptHtml } from '../printing/documentTemplates';
@@ -22,6 +23,7 @@ import BillForm from './BillForm';
 
 const NewBillScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef(null);
   const { submitBill, submitting, error, clearError } = useCreateBill();
   const { profile: owner, profileLoaded } = useProfile();
   const receiptDocs = useDocumentActions();
@@ -31,7 +33,12 @@ const NewBillScreen = ({ navigation }) => {
     async (values) => {
       clearError();
       const result = await submitBill(values);
-      if (result) setLastCreated(result);
+      if (result) {
+        setLastCreated(result);
+        // The receipt card renders above the (now reset) form, so bring it
+        // into view instead of leaving the user at the bottom of the page.
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
       return result;
     },
     [clearError, submitBill],
@@ -50,24 +57,53 @@ const NewBillScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // Android runs edge-to-edge, so `adjustResize` no longer shrinks the
+      // window — `padding` is what keeps fields clear of the keyboard.
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.flex}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: insets.bottom + SPACING.lg },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {!!lastCreated && (
           <Card style={styles.receipt}>
             <Text style={styles.receiptTitle}>Bill created</Text>
-            <Text style={styles.receiptLine}>
-              {lastCreated.bill.item_name} × {lastCreated.bill.qty} —{' '}
-              {formatCurrency(lastCreated.bill.bill_total)}
-            </Text>
+
+            {/* Every line, not just the flat first item — a multi-item bill
+                was confirming itself as a one-item sale. */}
+            {billItems(lastCreated.bill).map((item, index) => (
+              <View
+                key={item.id ?? `${lastCreated.bill.id}-${index}`}
+                style={styles.receiptItem}
+              >
+                <Text style={styles.receiptItemName} numberOfLines={2}>
+                  {item.item_name}
+                </Text>
+                <Text style={styles.receiptItemMeta}>
+                  {item.qty} × {formatCurrency(item.rate)}
+                </Text>
+                <Text style={styles.receiptItemAmount}>
+                  {formatCurrency(
+                    item.line_total ?? calculateBillTotal(item.qty, item.rate),
+                  )}
+                </Text>
+              </View>
+            ))}
+
+            <View style={styles.receiptTotalRow}>
+              <Text style={styles.receiptTotalLabel}>Bill total</Text>
+              <Text style={styles.receiptTotalValue}>
+                {formatCurrency(lastCreated.bill.bill_total)}
+              </Text>
+            </View>
+
             <Text style={styles.receiptLine}>
               {lastCreated.customer.name} now owes{' '}
               {formatCurrency(lastCreated.customer.total_unpaid)} of{' '}
@@ -138,6 +174,48 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.text,
     marginTop: 2,
+  },
+  receiptItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: SPACING.xs,
+  },
+  receiptItemName: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    paddingRight: SPACING.sm,
+  },
+  receiptItemMeta: {
+    width: 110,
+    textAlign: 'right',
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textLight,
+  },
+  receiptItemAmount: {
+    width: 86,
+    textAlign: 'right',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  receiptTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.success,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+  },
+  receiptTotalLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  receiptTotalValue: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.text,
   },
   receiptDocs: { marginTop: SPACING.md },
   receiptActions: { flexDirection: 'row', marginTop: SPACING.sm },

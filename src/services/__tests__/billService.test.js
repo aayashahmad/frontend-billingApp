@@ -35,9 +35,7 @@ const fieldsOf = (formData) => formData.entries;
 const base = {
   phone: '9876543210',
   customerName: 'Asha Traders',
-  itemName: 'Cement',
-  qty: '2',
-  rate: '500',
+  items: [{ itemName: 'Cement', qty: '2', rate: '500' }],
 };
 
 const asset = { uri: 'file://cheque.jpg', fileName: 'cheque.jpg' };
@@ -126,8 +124,32 @@ describe('buildBillFormData', () => {
     );
     expect(sent.phone).toBe('9876543210');
     expect(sent.customer_name).toBe('Asha Traders');
+    // The flat fields still carry the first line, so a server predating
+    // multi-item bills gets a request it can still satisfy.
     expect(sent.item_name).toBe('Cement');
     expect(sent.qty).toBe('2');
     expect(sent.rate).toBe('500');
+  });
+
+  it('sends every line item as a JSON array', () => {
+    const sent = fieldsOf(
+      buildBillFormData({
+        ...base,
+        items: [
+          { itemName: 'Cement', qty: '2', rate: '500' },
+          { itemName: ' Steel rod ', qty: '4', rate: '125.5' },
+        ],
+        paymentType: PAYMENT_TYPES.CASH,
+        amountPaid: '0',
+      }),
+    );
+
+    expect(JSON.parse(sent.items)).toEqual([
+      { item_name: 'Cement', qty: 2, rate: 500 },
+      { item_name: 'Steel rod', qty: 4, rate: 125.5 },
+    ]);
+    // The flat mirror stays on the first line regardless of how many there are.
+    expect(sent.item_name).toBe('Cement');
+    expect(sent.qty).toBe('2');
   });
 });

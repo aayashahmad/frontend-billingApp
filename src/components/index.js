@@ -1,3 +1,5 @@
+export { default as BarcodeScannerModal } from './BarcodeScannerModal';
+export { default as BillDetailModal } from './BillDetailModal';
 export { default as BillListItem } from './BillListItem';
 export { default as Button } from './Button';
 export { default as Card } from './Card';

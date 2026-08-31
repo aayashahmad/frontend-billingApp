@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -68,6 +69,7 @@ const LetterheadPreview = ({ values }) => {
  * settings mode it is an ordinary editable screen reached from the drawer.
  */
 const BusinessProfileScreen = ({ onboarding = false }) => {
+  const insets = useSafeAreaInsets();
   const { profile, loading, saving, error, refresh, saveBusinessProfile } =
     useProfile();
   const [saved, setSaved] = useState(false);
@@ -116,12 +118,21 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
   return (
     <KeyboardAvoidingView
       style={styles.fill}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // The app runs edge-to-edge on Android, so `adjustResize` no longer
+      // shrinks the window and the default (undefined) behaviour left the
+      // lower fields sitting under the keyboard. `padding` works on both.
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          // Clears the Android gesture/navigation bar, which was drawing on
+          // top of the save button.
+          { paddingBottom: insets.bottom + SPACING.xl },
+        ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {onboarding && (
           <View style={styles.welcome}>

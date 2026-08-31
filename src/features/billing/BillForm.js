@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Formik } from 'formik';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import CustomerSummaryCard from '../../components/CustomerSummaryCard';
@@ -12,11 +14,13 @@ import {
   PAYMENT_TYPES,
   PHONE_MAX_LENGTH,
 } from '../../constants/paymentTypes';
-import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
+import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useCustomerLookup } from '../../hooks/useCustomerLookup';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { getProductByBarcode, saveProduct } from '../../services/productService';
 import {
   calculateBillTotal,
+  calculateItemsTotal,
   calculateUnbalance,
   hasPaymentReference,
   usesEnteredAmount,
@@ -25,10 +29,160 @@ import { formatCurrency } from '../../utils/money';
 import {
   INITIAL_BILL_VALUES,
   billValidationSchema,
+  createEmptyItem,
 } from './billValidationSchema';
 import PaymentTypeToggle from './PaymentTypeToggle';
 
 const PHONE_LOOKUP_DEBOUNCE_MS = 400;
+
+/**
+ * One line of the bill.
+ *
+ * The scan button writes the raw barcode into the item name — there is no
+ * product catalogue to resolve it against, so quantity and rate stay manual.
+ */
+const ItemRow = ({
+  index,
+  item,
+  error,
+  touched,
+  canRemove,
+  disabled,
+  onChangeField,
+  onScanResolved,
+  onBlurField,
+  onRemove,
+}) => {
+  const [scanning, setScanning] = useState(false);
+  const [lookup, setLookup] = useState(null);
+
+  const lineTotal = calculateBillTotal(item.qty, item.rate);
+  const fieldError = (name) =>
+    touched?.[name] && error?.[name] ? error[name] : undefined;
+
+  const handleScanned = async (code) => {
+    setScanning(false);
+    setLookup({ status: 'loading' });
+
+    try {
+      const product = await getProductByBarcode(code);
+
+      if (product) {
+        // Known barcode: the catalogue supplies the name and price.
+        onScanResolved(code, product);
+        setLookup({ status: 'matched', name: product.name });
+      } else {
+        // Unknown barcode: leave the fields for the user to fill in. What
+        // they type is saved to the catalogue once the bill goes through, so
+        // the next scan of this code fills itself in.
+        onScanResolved(code, null);
+        setLookup({ status: 'new' });
+      }
+    } catch (err) {
+      // A failed lookup must not block the sale — the code is still recorded
+      // and the user can type the details by hand.
+      onScanResolved(code, null);
+      setLookup({ status: 'error', message: err.message });
+    }
+  };
+
+  const lookupHint = () => {
+    if (!lookup) return null;
+    if (lookup.status === 'loading') return 'Looking up barcode…';
+    if (lookup.status === 'matched') return `Matched "${lookup.name}" from your products.`;
+    if (lookup.status === 'new')
+      return 'New barcode — enter the name and rate and we will save it for next time.';
+    return lookup.message;
+  };
+
+  return (
+    <Card style={styles.itemCard}>
+      <View style={styles.itemHeader}>
+        <Text style={styles.itemHeading}>Item {index + 1}</Text>
+        {canRemove && (
+          <Pressable
+            onPress={onRemove}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove item ${index + 1}`}
+            hitSlop={8}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Ionicons name="close-circle" size={22} color={COLORS.danger} />
+          </Pressable>
+        )}
+      </View>
+
+      <View style={styles.itemNameRow}>
+        <Input
+          label="Item name"
+          placeholder="What was sold?"
+          value={item.itemName}
+          onChangeText={(text) => onChangeField('itemName', text)}
+          onBlur={() => onBlurField('itemName')}
+          error={fieldError('itemName')}
+          hint={lookupHint()}
+          containerStyle={styles.itemNameInput}
+          editable={!disabled}
+        />
+        <Pressable
+          onPress={() => setScanning(true)}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`Scan barcode for item ${index + 1}`}
+          style={({ pressed }) => [
+            styles.scanButton,
+            disabled && styles.scanButtonDisabled,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons name="barcode-outline" size={22} color={COLORS.white} />
+        </Pressable>
+      </View>
+
+      <View style={styles.row}>
+        <Input
+          label="Quantity"
+          placeholder="0"
+          value={String(item.qty)}
+          onChangeText={(text) =>
+            onChangeField('qty', text.replace(/[^\d]/g, ''))
+          }
+          onBlur={() => onBlurField('qty')}
+          keyboardType="number-pad"
+          error={fieldError('qty')}
+          containerStyle={styles.rowItem}
+          editable={!disabled}
+        />
+        <View style={styles.rowGap} />
+        <Input
+          label="Rate per unit"
+          placeholder="0.00"
+          value={String(item.rate)}
+          onChangeText={(text) =>
+            onChangeField('rate', text.replace(/[^\d.]/g, ''))
+          }
+          onBlur={() => onBlurField('rate')}
+          keyboardType="decimal-pad"
+          error={fieldError('rate')}
+          containerStyle={styles.rowItem}
+          editable={!disabled}
+        />
+      </View>
+
+      <View style={styles.lineTotalRow}>
+        <Text style={styles.lineTotalLabel}>Line total</Text>
+        <Text style={styles.lineTotalValue}>{formatCurrency(lineTotal)}</Text>
+      </View>
+
+      <BarcodeScannerModal
+        visible={scanning}
+        onScanned={handleScanned}
+        onClose={() => setScanning(false)}
+      />
+    </Card>
+  );
+};
 
 const BillFormFields = ({
   values,
@@ -83,8 +237,8 @@ const BillFormFields = ({
   const referenceLabels = PAYMENT_REFERENCE_LABELS[values.paymentType];
 
   const billTotal = useMemo(
-    () => calculateBillTotal(values.qty, values.rate),
-    [values.qty, values.rate],
+    () => calculateItemsTotal(values.items),
+    [values.items],
   );
 
   const unbalance = useMemo(
@@ -125,6 +279,55 @@ const BillFormFields = ({
       }
     },
     [setFieldValue],
+  );
+
+  const handleItemChange = useCallback(
+    (index, name, value) => setFieldValue(`items[${index}].${name}`, value),
+    [setFieldValue],
+  );
+
+  /**
+   * Writes a scan onto the line in a single update.
+   *
+   * Field-by-field updates would each rebuild `values.items`, so the later
+   * ones would overwrite the earlier from a stale array.
+   */
+  const handleScanResolved = useCallback(
+    (index, barcode, product) =>
+      setFieldValue(
+        'items',
+        values.items.map((line, position) =>
+          position === index
+            ? {
+                ...line,
+                barcode,
+                isNewProduct: !product,
+                itemName: product ? product.name : line.itemName,
+                rate: product ? String(product.rate) : line.rate,
+              }
+            : line,
+        ),
+      ),
+    [setFieldValue, values.items],
+  );
+
+  const handleItemBlur = useCallback(
+    (index, name) => setFieldTouched(`items[${index}].${name}`, true),
+    [setFieldTouched],
+  );
+
+  const handleAddItem = useCallback(
+    () => setFieldValue('items', [...values.items, createEmptyItem()]),
+    [setFieldValue, values.items],
+  );
+
+  const handleRemoveItem = useCallback(
+    (index) =>
+      setFieldValue(
+        'items',
+        values.items.filter((_, position) => position !== index),
+      ),
+    [setFieldValue, values.items],
   );
 
   const handleScreenshotChange = useCallback(
@@ -182,43 +385,48 @@ const BillFormFields = ({
         editable={!submitting}
       />
 
-      <Input
-        label="Item name"
-        placeholder="What was sold?"
-        value={values.itemName}
-        onChangeText={(text) => setFieldValue('itemName', text)}
-        onBlur={handleBlur('itemName')}
-        error={fieldError('itemName')}
-        editable={!submitting}
-      />
+      <Text style={styles.sectionTitle}>
+        Items{values.items.length > 1 ? ` (${values.items.length})` : ''}
+      </Text>
 
-      <View style={styles.row}>
-        <Input
-          label="Quantity"
-          placeholder="0"
-          value={String(values.qty)}
-          onChangeText={(text) => setFieldValue('qty', text.replace(/[^\d]/g, ''))}
-          onBlur={handleBlur('qty')}
-          keyboardType="number-pad"
-          error={fieldError('qty')}
-          containerStyle={styles.rowItem}
-          editable={!submitting}
-        />
-        <View style={styles.rowGap} />
-        <Input
-          label="Rate per unit"
-          placeholder="0.00"
-          value={String(values.rate)}
-          onChangeText={(text) =>
-            setFieldValue('rate', text.replace(/[^\d.]/g, ''))
+      {values.items.map((item, index) => (
+        <ItemRow
+          // Index as key: rows have no stable id, and removal rebuilds the
+          // list from the surviving values either way.
+          key={`item-${index}`}
+          index={index}
+          item={item}
+          error={errors.items?.[index]}
+          touched={touched.items?.[index]}
+          canRemove={values.items.length > 1}
+          disabled={submitting}
+          onChangeField={(name, value) => handleItemChange(index, name, value)}
+          onScanResolved={(barcode, product) =>
+            handleScanResolved(index, barcode, product)
           }
-          onBlur={handleBlur('rate')}
-          keyboardType="decimal-pad"
-          error={fieldError('rate')}
-          containerStyle={styles.rowItem}
-          editable={!submitting}
+          onBlurField={(name) => handleItemBlur(index, name)}
+          onRemove={() => handleRemoveItem(index)}
         />
-      </View>
+      ))}
+
+      {typeof errors.items === 'string' && (
+        <Text style={styles.lookupError}>{errors.items}</Text>
+      )}
+
+      <Pressable
+        onPress={handleAddItem}
+        disabled={submitting}
+        accessibilityRole="button"
+        accessibilityLabel="Add another item"
+        style={({ pressed }) => [
+          styles.addItem,
+          submitting && styles.addItemDisabled,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Ionicons name="add-circle-outline" size={20} color={COLORS.primary} />
+        <Text style={styles.addItemText}>Add item</Text>
+      </Pressable>
 
       <Card style={styles.totalCard}>
         <View style={styles.totalRow}>
@@ -300,11 +508,38 @@ const BillFormFields = ({
   );
 };
 
+/**
+ * Adds newly scanned items to the catalogue so the next scan fills itself in.
+ *
+ * Runs only after the bill is recorded, and swallows its own failures: the
+ * sale is already saved by this point, and losing a catalogue entry is not
+ * worth reporting as a failed bill. Lines whose barcode the catalogue already
+ * knew are left alone — prices are edited on the products screen, not as a
+ * side effect of one sale.
+ */
+const rememberScannedProducts = async (items = []) => {
+  const unknown = items.filter(
+    (item) => item.barcode && item.isNewProduct && item.itemName?.trim(),
+  );
+
+  await Promise.all(
+    unknown.map((item) =>
+      saveProduct({
+        barcode: item.barcode,
+        name: item.itemName,
+        rate: item.rate,
+      }).catch(() => null),
+    ),
+  );
+};
+
 const BillForm = ({ onSubmitBill, submitting, submitError, onClearSubmitError }) => {
   const handleFormikSubmit = useCallback(
     async (values, helpers) => {
       const result = await onSubmitBill(values);
-      if (result) helpers.resetForm({ values: INITIAL_BILL_VALUES });
+      if (!result) return;
+      await rememberScannedProducts(values.items);
+      helpers.resetForm({ values: INITIAL_BILL_VALUES });
     },
     [onSubmitBill],
   );
@@ -331,6 +566,74 @@ const BillForm = ({ onSubmitBill, submitting, submitError, onClearSubmitError })
 
 const styles = StyleSheet.create({
   spacedTop: { marginTop: SPACING.md },
+  pressed: { opacity: 0.7 },
+  sectionTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  itemCard: { marginBottom: SPACING.sm },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  itemHeading: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  // The scan button sits beside the field, so the input's own bottom margin
+  // would push it out of alignment — hence the explicit offset.
+  itemNameRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  itemNameInput: { flex: 1 },
+  scanButton: {
+    width: 46,
+    height: 46,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
+    marginTop: 22,
+  },
+  scanButtonDisabled: { backgroundColor: COLORS.textMuted },
+  lineTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: SPACING.sm,
+  },
+  lineTotalLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textLight },
+  lineTotalValue: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  addItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.primary,
+  },
+  addItemDisabled: { opacity: 0.5 },
+  addItemText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    marginLeft: SPACING.xs,
+  },
   summary: { marginBottom: SPACING.sm },
   lookupError: {
     color: COLORS.danger,

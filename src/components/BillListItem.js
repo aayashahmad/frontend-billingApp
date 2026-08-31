@@ -7,15 +7,24 @@ import {
   PAYMENT_TYPES,
 } from '../constants/paymentTypes';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../constants/theme';
-import { hasPaymentReference, summariseBill } from '../utils/billing';
+import { billItems, hasPaymentReference, summariseBill } from '../utils/billing';
 import { formatDateTime } from '../utils/date';
 import { formatCurrency } from '../utils/money';
 import Card from './Card';
 
-const BillListItem = ({ bill, onViewTransaction, actions }) => {
+const BillListItem = ({ bill, onPress, onViewTransaction, actions }) => {
   const { billTotal, amountPaid, unbalance } = useMemo(
     () => summariseBill(bill),
     [bill],
+  );
+
+  // A bill can carry several lines. Name the first and count the rest rather
+  // than growing the card — the full list is on the receipt.
+  const items = useMemo(() => billItems(bill), [bill]);
+  const extraItems = items.length - 1;
+  const totalQty = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+    [items],
   );
 
   const hasReference = hasPaymentReference(bill.payment_type);
@@ -23,25 +32,31 @@ const BillListItem = ({ bill, onViewTransaction, actions }) => {
   const canViewTransaction =
     hasReference && Boolean(bill.transaction_screenshot_url);
 
-  const handlePress = useCallback(() => {
+  // The row opens the bill's details. The reference link is a shortcut
+  // straight to the payment image, so it stops the press from doing both.
+  const handlePress = useCallback(() => onPress?.(bill), [bill, onPress]);
+
+  const handleViewTransaction = useCallback(() => {
     if (canViewTransaction) onViewTransaction?.(bill);
   }, [bill, canViewTransaction, onViewTransaction]);
 
   return (
     <Pressable
       onPress={handlePress}
-      disabled={!canViewTransaction}
-      accessibilityRole={canViewTransaction ? 'button' : undefined}
-      style={({ pressed }) => [pressed && canViewTransaction && styles.pressed]}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? `Bill ${bill.id} details` : undefined}
+      style={({ pressed }) => [pressed && !!onPress && styles.pressed]}
     >
       <Card style={styles.card}>
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text style={styles.itemName} numberOfLines={2}>
-              {bill.item_name}
+              {items[0]?.item_name ?? bill.item_name}
+              {extraItems > 0 ? ` +${extraItems} more` : ''}
             </Text>
             <Text style={styles.meta}>
-              Qty {bill.qty} · {formatDateTime(bill.created_at)}
+              Qty {totalQty} · {formatDateTime(bill.created_at)}
             </Text>
           </View>
           <View style={[styles.badge, hasReference ? styles.badgeOnline : styles.badgeCash]}>
@@ -80,7 +95,12 @@ const BillListItem = ({ bill, onViewTransaction, actions }) => {
               {bill.transaction_number || '—'}
             </Text>
             {canViewTransaction && (
-              <Text style={styles.viewLink}>
+              <Text
+                onPress={handleViewTransaction}
+                suppressHighlighting
+                accessibilityRole="button"
+                style={styles.viewLink}
+              >
                 {bill.payment_type === PAYMENT_TYPES.CHEQUE
                   ? 'View cheque'
                   : 'View screenshot'}

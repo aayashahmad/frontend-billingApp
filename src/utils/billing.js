@@ -6,6 +6,41 @@ export const calculateBillTotal = (qty, rate) =>
   roundMoney(toNumber(qty) * toNumber(rate));
 
 /**
+ * Bill total across every line item.
+ *
+ * Falls back to the flat `item_name`/`qty`/`rate` shape when a bill has no
+ * `items` array — bills written before multi-item support, and the API's
+ * legacy single-item payload, both arrive that way.
+ */
+export const calculateItemsTotal = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+  return roundMoney(
+    items.reduce((sum, item) => sum + calculateBillTotal(item?.qty, item?.rate), 0),
+  );
+};
+
+/**
+ * Line items for a bill returned by the API, normalised.
+ *
+ * Older bills carry only the flat columns, so synthesise a single line from
+ * them rather than making every caller branch on an empty array.
+ */
+export const billItems = (bill) => {
+  if (Array.isArray(bill?.items) && bill.items.length > 0) return bill.items;
+  if (!bill?.item_name) return [];
+  return [
+    {
+      id: `${bill.id}-0`,
+      item_name: bill.item_name,
+      qty: bill.qty,
+      rate: bill.rate,
+      line_total: calculateBillTotal(bill.qty, bill.rate),
+      position: 0,
+    },
+  ];
+};
+
+/**
  * Outstanding amount on a bill.
  *
  * Only cash bills can carry a balance — an online bill is settled in full by
