@@ -1,13 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Card from '../../components/Card';
-import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
+import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { formatCurrency, toNumber } from '../../utils/money';
 
-const CustomerCard = ({ customer, onPress }) => {
+const CustomerCard = ({ customer, onPress, onPay }) => {
   const handlePress = useCallback(() => onPress?.(customer), [customer, onPress]);
+  const handlePay = useCallback(() => onPay?.(customer), [customer, onPay]);
   const unpaid = toNumber(customer.total_unpaid);
+  // Nothing owed, nothing to collect — the button would only ever error.
+  const canPay = Boolean(onPay) && unpaid > 0;
 
   return (
     <Pressable
@@ -32,6 +36,19 @@ const CustomerCard = ({ customer, onPress }) => {
             {unpaid > 0 ? `Due ${formatCurrency(unpaid)}` : 'Settled'}
           </Text>
         </View>
+
+        {canPay && (
+          <Pressable
+            onPress={handlePay}
+            accessibilityRole="button"
+            accessibilityLabel={`Take payment from ${customer.name}`}
+            hitSlop={6}
+            style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="cash-outline" size={16} color={COLORS.white} />
+            <Text style={styles.payText}>Pay</Text>
+          </Pressable>
+        )}
       </Card>
     </Pressable>
   );
@@ -56,6 +73,21 @@ const styles = StyleSheet.create({
   unpaid: { fontSize: FONT_SIZES.xs, marginTop: 2, fontWeight: '600' },
   due: { color: COLORS.danger },
   settled: { color: COLORS.success },
+  payButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.success,
+  },
+  payText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
 });
 
 export default React.memo(CustomerCard);

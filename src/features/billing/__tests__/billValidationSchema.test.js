@@ -165,6 +165,28 @@ describe('billValidationSchema — cash bills', () => {
     ).resolves.toEqual([]);
   });
 
+  it('allows paying more than the bill when the customer owes more', async () => {
+    // Owes 900, buys 100 more, hands over 1000 to settle everything.
+    await expect(
+      errorPaths({
+        ...validCashBill,
+        items: [{ itemName: 'It1', qty: '1', rate: '100' }],
+        outstandingBalance: 900,
+        amountPaid: '1000',
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it('still rejects a payment beyond the bill plus everything outstanding', async () => {
+    const paths = await errorPaths({
+      ...validCashBill,
+      items: [{ itemName: 'It1', qty: '1', rate: '100' }],
+      outstandingBalance: 900,
+      amountPaid: '1001',
+    });
+    expect(paths).toContain('amountPaid');
+  });
+
   it('allows overpayment when the schema is built with allowOverpayment', async () => {
     const schema = createBillValidationSchema({ allowOverpayment: true });
     await expect(

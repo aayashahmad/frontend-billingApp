@@ -4,6 +4,8 @@ import {
   calculateBillTotal,
   calculateItemsTotal,
   calculateUnbalance,
+  outstandingAfterPayments,
+  sumPayments,
 } from '../billing';
 import { PAYMENT_TYPES } from '../../constants/paymentTypes';
 
@@ -128,5 +130,27 @@ describe('billItems', () => {
   it('returns nothing for a bill with neither', () => {
     expect(billItems({ id: 9 })).toEqual([]);
     expect(billItems(null)).toEqual([]);
+  });
+});
+
+describe('payments against dues', () => {
+  const payments = [{ amount: 400 }, { amount: '600.50' }];
+
+  it('sums what has been received', () => {
+    expect(sumPayments(payments)).toBe(1000.5);
+    expect(sumPayments([])).toBe(0);
+    expect(sumPayments(undefined)).toBe(0);
+  });
+
+  it('takes payments off the balance derived from bills', () => {
+    expect(outstandingAfterPayments(1000, [{ amount: 400 }])).toBe(600);
+  });
+
+  it('never reports a negative balance', () => {
+    expect(outstandingAfterPayments(100, [{ amount: 500 }])).toBe(0);
+  });
+
+  it('leaves the balance alone when nothing has been paid', () => {
+    expect(outstandingAfterPayments(750, [])).toBe(750);
   });
 });

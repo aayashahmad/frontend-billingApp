@@ -96,6 +96,22 @@ export const summariseBill = (bill) => {
   };
 };
 
+/** Total received against dues, separate from what any bill recorded. */
+export const sumPayments = (payments = []) =>
+  roundMoney(
+    payments.reduce((total, payment) => total + toNumber(payment?.amount), 0),
+  );
+
+/**
+ * What a customer still owes, once standalone payments are taken off.
+ *
+ * Bills carry their own unpaid figure, but a payment settles dues without
+ * touching any bill — so deriving the balance from bills alone would keep
+ * showing money the customer has already handed over.
+ */
+export const outstandingAfterPayments = (billsUnpaid, payments = []) =>
+  Math.max(roundMoney(toNumber(billsUnpaid) - sumPayments(payments)), 0);
+
 /** Aggregate totals derived from bills — used to keep the header in sync. */
 export const aggregateBillTotals = (bills = []) =>
   bills.reduce(

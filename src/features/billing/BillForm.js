@@ -25,7 +25,7 @@ import {
   hasPaymentReference,
   usesEnteredAmount,
 } from '../../utils/billing';
-import { formatCurrency } from '../../utils/money';
+import { formatCurrency, toNumber } from '../../utils/money';
 import {
   INITIAL_BILL_VALUES,
   billValidationSchema,
@@ -220,7 +220,13 @@ const BillFormFields = ({
 
     const run = async () => {
       const found = await lookup(debouncedPhone);
-      if (!active || !found) return;
+      if (!active) return;
+
+      // What this customer already owes raises the ceiling on what they may
+      // hand over: settling old dues alongside a new purchase is one payment.
+      setFieldValue('outstandingBalance', found ? found.total_unpaid : 0);
+
+      if (!found) return;
       if (!nameEditedRef.current) setFieldValue('customerName', found.name);
     };
 
@@ -245,6 +251,8 @@ const BillFormFields = ({
     () => (entersAmount ? calculateUnbalance(billTotal, values.amountPaid) : 0),
     [entersAmount, billTotal, values.amountPaid],
   );
+
+  const outstanding = Math.max(toNumber(values.outstandingBalance), 0);
 
   const handlePhoneChange = useCallback(
     (text) => {
@@ -466,7 +474,11 @@ const BillFormFields = ({
           onBlur={handleBlur('amountPaid')}
           keyboardType="decimal-pad"
           error={fieldError('amountPaid')}
-          hint="Balance due is calculated automatically from the bill total."
+          hint={
+            outstanding > 0
+              ? `${formatCurrency(outstanding)} already outstanding — a larger payment settles that too.`
+              : 'Balance due is calculated automatically from the bill total.'
+          }
           editable={!submitting}
         />
       )}

@@ -9,6 +9,7 @@ import { useMyCustomers } from '../../hooks/useMyCustomers';
 import { useProfile } from '../../store/ProfileContext';
 import { formatCurrency } from '../../utils/money';
 import CustomerCard from './CustomerCard';
+import RecordPaymentModal from './RecordPaymentModal';
 
 const keyExtractor = (customer) => String(customer.id);
 
@@ -18,6 +19,7 @@ const MyCustomersScreen = ({ navigation }) => {
     useMyCustomers();
   const { profile } = useProfile();
   const [filter, setFilter] = useState('');
+  const [payingCustomer, setPayingCustomer] = useState(null);
 
   // Filtering locally — the whole book is already loaded, so a round trip
   // per keystroke would be slower and no more correct.
@@ -41,9 +43,24 @@ const MyCustomersScreen = ({ navigation }) => {
     [navigation],
   );
 
+  const handlePay = useCallback((customer) => setPayingCustomer(customer), []);
+
+  // The balance just changed, so the list has to come from the server again
+  // rather than be patched in place.
+  const handleRecorded = useCallback(() => {
+    setPayingCustomer(null);
+    refresh();
+  }, [refresh]);
+
   const renderItem = useCallback(
-    ({ item }) => <CustomerCard customer={item} onPress={handleSelectCustomer} />,
-    [handleSelectCustomer],
+    ({ item }) => (
+      <CustomerCard
+        customer={item}
+        onPress={handleSelectCustomer}
+        onPay={handlePay}
+      />
+    ),
+    [handlePay, handleSelectCustomer],
   );
 
   const header = useMemo(
@@ -143,6 +160,12 @@ const MyCustomersScreen = ({ navigation }) => {
             tintColor={COLORS.primary}
           />
         }
+      />
+
+      <RecordPaymentModal
+        customer={payingCustomer}
+        onClose={() => setPayingCustomer(null)}
+        onRecorded={handleRecorded}
       />
     </View>
   );

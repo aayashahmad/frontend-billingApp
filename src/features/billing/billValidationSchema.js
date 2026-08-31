@@ -10,6 +10,7 @@ import {
   hasPaymentReference,
   usesEnteredAmount,
 } from '../../utils/billing';
+import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
 
 /** Yup coerces '' to NaN for number fields; map it to undefined instead. */
 const emptyStringToUndefined = (value, originalValue) =>
@@ -67,15 +68,32 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
             .required('Amount paid is required')
             .min(0, 'Amount paid cannot be negative')
             .test(
-              'within-bill-total',
-              'Amount paid cannot exceed the bill total',
+              'within-payable',
+              // A customer settling old dues alongside a new purchase hands
+              // over one amount covering both, so the ceiling is this bill
+              // plus whatever they already owe — not the bill alone.
+              'payable',
               function validateAgainstTotal(value) {
                 if (allowOverpayment || value === undefined) return true;
+
                 const billTotal = calculateItemsTotal(this.parent.items);
                 // Skip until the lines are themselves valid — their own rules
                 // will surface the error rather than this one.
                 if (billTotal <= 0) return true;
-                return value <= billTotal;
+
+                const outstanding = Math.max(
+                  toNumber(this.parent.outstandingBalance),
+                  0,
+                );
+                const payable = roundMoney(billTotal + outstanding);
+                if (value <= payable) return true;
+
+                return this.createError({
+                  message:
+                    outstanding > 0
+                      ? `Amount paid cannot exceed ${formatCurrency(payable)} — this bill plus ${formatCurrency(outstanding)} already outstanding.`
+                      : `Amount paid cannot exceed the bill total of ${formatCurrency(billTotal)}.`,
+                });
               },
             ),
         otherwise: (schema) => schema.notRequired(),
@@ -126,6 +144,9 @@ export const INITIAL_BILL_VALUES = Object.freeze({
   customerName: '',
   items: [createEmptyItem()],
   paymentType: PAYMENT_TYPES.CASH,
+  // Filled in from the customer lookup. Not sent to the API — it only raises
+  // the ceiling on what the customer is allowed to hand over.
+  outstandingBalance: 0,
   amountPaid: '',
   transactionNumber: '',
   transactionScreenshot: null,

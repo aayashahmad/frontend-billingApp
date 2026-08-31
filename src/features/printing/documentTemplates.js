@@ -8,6 +8,8 @@ import {
   billItems,
   calculateBillTotal,
   hasPaymentReference,
+  outstandingAfterPayments,
+  sumPayments,
   summariseBill,
 } from '../../utils/billing';
 import { formatDateTime } from '../../utils/date';
@@ -277,8 +279,18 @@ export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
 };
 
 /** Full account statement covering every bill for one customer. */
-export const buildCustomerStatementHtml = ({ customer, bills = [], owner, issuedAt }) => {
+export const buildCustomerStatementHtml = ({
+  customer,
+  bills = [],
+  owner,
+  issuedAt,
+  payments = [],
+}) => {
   const { totalAmount, totalUnpaid } = aggregateBillTotals(bills);
+  // Payments settle dues without touching any bill, so a statement that
+  // ignored them would bill the customer for money already handed over.
+  const paymentsTotal = sumPayments(payments);
+  const outstanding = outstandingAfterPayments(totalUnpaid, payments);
 
   const rows = bills.length
     ? bills
@@ -335,15 +347,54 @@ export const buildCustomerStatementHtml = ({ customer, bills = [], owner, issued
       <tbody>${rows}</tbody>
     </table>
 
+    ${
+      payments.length
+        ? `
+    <div class="section-title">Payments received (${payments.length})</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Method</th>
+          <th>Reference</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${payments
+          .map(
+            (payment) => `
+        <tr>
+          <td>${escapeHtml(formatDateTime(payment.created_at))}</td>
+          <td>${paymentBadge(payment.payment_type)}</td>
+          <td>${escapeHtml(payment.transaction_number || '—')}</td>
+          <td class="num">${formatCurrency(payment.amount)}</td>
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>`
+        : ''
+    }
+
     <table class="totals">
       <tr>
         <td class="label">Total billed</td>
         <td class="num">${formatCurrency(totalAmount)}</td>
       </tr>
+      ${
+        payments.length
+          ? `
+      <tr>
+        <td class="label">Payments received</td>
+        <td class="num">−${formatCurrency(paymentsTotal)}</td>
+      </tr>`
+          : ''
+      }
       <tr class="grand">
         <td>Outstanding</td>
-        <td class="num ${totalUnpaid > 0 ? 'due' : 'settled'}">
-          ${formatCurrency(totalUnpaid)}
+        <td class="num ${outstanding > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(outstanding)}
         </td>
       </tr>
     </table>
