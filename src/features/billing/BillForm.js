@@ -79,7 +79,7 @@ const ItemRow = ({
 
     if (product) {
       onScanResolved(code, product);
-      setLookup({ status: 'matched', name: product.name });
+      setLookup({ status: 'matched', code, name: product.name });
       return;
     }
 
@@ -93,28 +93,33 @@ const ItemRow = ({
     if (publicMatch) {
       setLookup({
         status: 'suggested',
+        code,
         name: publicMatch.name,
         source: publicMatch.attribution,
       });
     } else if (catalogueError) {
       setLookup({
         status: 'error',
+        code,
         message: `Could not reach your products (${catalogueError.message}). Enter the name and rate by hand.`,
       });
     } else {
-      setLookup({ status: 'new' });
+      setLookup({ status: 'new', code });
     }
   };
 
   const lookupHint = () => {
     if (!lookup) return null;
     if (lookup.status === 'loading') return 'Looking up barcode…';
-    if (lookup.status === 'matched') return `Matched "${lookup.name}" from your products.`;
+    if (lookup.status === 'matched')
+      return `${lookup.code} — matched "${lookup.name}" from your products.`;
     if (lookup.status === 'suggested')
-      return `Name from ${lookup.source} — check it and enter your rate. Saved to your products after the bill.`;
+      // No public database carries a shop's selling price, so the rate is
+      // always the owner's to enter the first time.
+      return `${lookup.code} — name from ${lookup.source}. Enter your rate; the next scan fills both.`;
     if (lookup.status === 'new')
-      return 'New barcode — enter the name and rate and we will save it for next time.';
-    return lookup.message;
+      return `${lookup.code} — not in your products yet. Enter the name and rate; the next scan of this barcode fills both.`;
+    return `${lookup.code} — ${lookup.message}`;
   };
 
   return (

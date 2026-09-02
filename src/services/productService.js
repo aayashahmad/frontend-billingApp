@@ -54,3 +54,15 @@ export const updateProduct = async (id, changes, { signal } = {}) => {
 export const deleteProduct = async (id, { signal } = {}) => {
   await api.delete(`/products/${id}`, { signal });
 };
+
+/**
+ * Bulk upsert a price list.
+ *
+ * Sent as JSON rather than the raw file so the CSV quirks — quoting, header
+ * aliases, currency symbols — are dealt with on the device, where the errors
+ * can be shown against the line the owner can actually see.
+ */
+export const importProducts = async (rows, { signal } = {}) => {
+  const { data } = await api.post('/products/import', { rows }, { signal });
+  return data;
+};

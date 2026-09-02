@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-import { API_TIMEOUT_MS, API_URL } from '../constants/config';
+import {
+  API_COLD_START_RETRIES,
+  API_TIMEOUT_MS,
+  API_URL,
+} from '../constants/config';
 
 export const HTTP_STATUS = Object.freeze({
   UNAUTHORIZED: 401,
@@ -111,9 +115,45 @@ export const toApiError = (error) => {
   return new ApiError(error?.message || 'Something went wrong.');
 };
 
+/**
+ * Whether a failure is worth one more attempt.
+ *
+ * Only timeouts and connection failures, and only on reads. A POST that
+ * timed out may well have been received and applied, so replaying it could
+ * write a second bill or take a payment twice.
+ */
+const isRetryableColdStart = (error, config) => {
+  const method = String(config?.method || 'get').toLowerCase();
+  if (method !== 'get') return false;
+  if (config?.signal?.aborted) return false;
+
+  return (
+    error?.code === 'ECONNABORTED' ||
+    error?.code === 'ETIMEDOUT' ||
+    (!error?.response && Boolean(error?.request))
+  );
+};
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error?.config;
+
+    if (
+      config &&
+      !axios.isCancel?.(error) &&
+      error?.code !== 'ERR_CANCELED' &&
+      isRetryableColdStart(error, config)
+    ) {
+      config.__retryCount = config.__retryCount || 0;
+      if (config.__retryCount < API_COLD_START_RETRIES) {
+        config.__retryCount += 1;
+        // The first attempt is what wakes a sleeping instance; by the time
+        // this one lands it is usually serving.
+        return api.request(config);
+      }
+    }
+
     const apiError = toApiError(error);
     // A rejected token means the stored session is dead — drop it so the app
     // returns to the login screen instead of retrying with a stale token.

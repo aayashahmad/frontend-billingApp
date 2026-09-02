@@ -23,7 +23,10 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useProducts } from '../../hooks/useProducts';
 import { lookupPublicProduct } from '../../services/productLookupService';
+import { importProducts } from '../../services/productService';
+import { parseProductCsv } from '../../utils/csv';
 import { formatCurrency } from '../../utils/money';
+import { File } from 'expo-file-system';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -37,7 +40,7 @@ const blankDraft = { id: null, barcode: '', name: '', rate: '' };
  * The barcode is only editable while adding — a different barcode is a
  * different product, so an edit changes the name and price and nothing else.
  */
-const ProductEditor = ({ draft, saving, onChange, onSave, onClose }) => {
+const ProductEditor = ({ draft, saving, onChange, onSave, onClose, rapid }) => {
   const [scanning, setScanning] = useState(false);
   const keyboardHeight = useKeyboardHeight();
   const isEditing = draft.id !== null;
@@ -54,6 +57,11 @@ const ProductEditor = ({ draft, saving, onChange, onSave, onClose }) => {
             <Text style={styles.sheetTitle}>
               {isEditing ? 'Edit product' : 'Add product'}
             </Text>
+            {rapid && !isEditing && (
+              <Text style={styles.sheetHint}>
+                Saving reopens the scanner for the next item.
+              </Text>
+            )}
 
             <View style={styles.barcodeRow}>
               <Input
@@ -108,7 +116,13 @@ const ProductEditor = ({ draft, saving, onChange, onSave, onClose }) => {
             />
 
             <Button
-              title={isEditing ? 'Save changes' : 'Add product'}
+              title={
+                isEditing
+                  ? 'Save changes'
+                  : rapid
+                    ? 'Save & scan next'
+                    : 'Add product'
+              }
               onPress={onSave}
               loading={saving}
               disabled={saving || !canSave}
@@ -191,6 +205,12 @@ const ProductsScreen = () => {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [draft, setDraft] = useState(null);
+  // Stocking a grocery shop means entering hundreds of items. In rapid mode
+  // saving one reopens the scanner straight away, so a shelf can be worked
+  // through without returning to this list between each item.
+  const [rapidScan, setRapidScan] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const {
     products,
@@ -213,8 +233,90 @@ const ProductsScreen = () => {
     const saved = draft.id
       ? await edit(draft.id, { name: draft.name, rate: Number(draft.rate) })
       : await create(draft);
-    if (saved) setDraft(null);
-  }, [create, draft, edit]);
+    if (!saved) return;
+
+    setDraft(null);
+    // Straight back to the camera for the next item off the shelf.
+    if (rapidScan && !draft.id) setScannerOpen(true);
+  }, [create, draft, edit, rapidScan]);
+
+  const handleCloseEditor = useCallback(() => {
+    setDraft(null);
+    setRapidScan(false);
+  }, []);
+
+  /**
+   * Import a price list prepared on a computer.
+   *
+   * Parsing happens here rather than server-side so a bad line can be
+   * reported against the row number the owner sees in their spreadsheet.
+   */
+  const handleImport = useCallback(async () => {
+    try {
+      const picked = await File.pickFileAsync({
+        // Some file managers report CSV as plain text, and a few report
+        // nothing at all — accepting all three avoids a picker that shows
+        // the file greyed out.
+        mimeTypes: ['text/csv', 'text/comma-separated-values', 'text/plain'],
+      });
+      if (picked.canceled || !picked.result) return;
+
+      setImporting(true);
+      const { rows, errors } = parseProductCsv(await picked.result.text());
+
+      if (rows.length === 0) {
+        Alert.alert(
+          'Nothing to import',
+          errors[0] ||
+            'Expected three columns: barcode, name, rate — one product per line.',
+        );
+        return;
+      }
+
+      const summary = await importProducts(rows);
+      await refresh();
+
+      const parts = [
+        `${summary.created} added`,
+        `${summary.updated} updated`,
+      ];
+      const skipped = errors.length + (summary.errors?.length ?? 0);
+      if (skipped > 0) parts.push(`${skipped} skipped`);
+
+      Alert.alert(
+        'Import finished',
+        `${parts.join(', ')}.` +
+          (errors.length
+            ? `\n\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n…and ${errors.length - 5} more.` : ''}`
+            : ''),
+      );
+    } catch (err) {
+      Alert.alert('Import failed', err?.message || 'Please try again.');
+    } finally {
+      setImporting(false);
+    }
+  }, [refresh]);
+
+  const handleStartRapidScan = useCallback(() => {
+    setRapidScan(true);
+    setScannerOpen(true);
+  }, []);
+
+  /** A scan in rapid mode opens the editor already filled in as far as it can be. */
+  const handleRapidScanned = useCallback(async (code) => {
+    setScannerOpen(false);
+    setDraft({ ...blankDraft, barcode: code });
+
+    // The public database may know the name; it never knows your price.
+    const match = await lookupPublicProduct(code);
+    if (match) {
+      setDraft((current) =>
+        current && current.barcode === code && !current.name.trim()
+          ? { ...current, name: match.name }
+          : current,
+      );
+    }
+  }, []);
 
   const handleDelete = useCallback(
     (product) => {
@@ -256,6 +358,27 @@ const ProductsScreen = () => {
           autoCorrect={false}
           containerStyle={styles.searchInput}
         />
+
+        <Pressable
+          onPress={handleImport}
+          disabled={importing}
+          accessibilityRole="button"
+          accessibilityLabel="Import a price list"
+          style={({ pressed }) => [
+            styles.importRow,
+            importing && styles.importRowBusy,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons
+            name="document-attach-outline"
+            size={18}
+            color={COLORS.primary}
+          />
+          <Text style={styles.importText}>
+            {importing ? 'Importing…' : 'Import price list (CSV)'}
+          </Text>
+        </Pressable>
       </View>
 
       {!!error && <Text style={styles.error}>{error}</Text>}
@@ -282,26 +405,51 @@ const ProductsScreen = () => {
             message={
               search
                 ? 'Try a different name or barcode.'
-                : 'Scan an item on a new bill and it is added here automatically, or add one now.'
+                : 'Scan items in one pass, or import a CSV of barcode, name, rate. After that, scanning an item on a bill fills its name and price automatically.'
             }
             style={styles.emptyState}
           />
         }
       />
 
-      <Pressable
-        onPress={() => setDraft(blankDraft)}
-        accessibilityRole="button"
-        accessibilityLabel="Add product"
-        style={({ pressed }) => [
-          styles.fab,
-          { bottom: insets.bottom + SPACING.lg },
-          pressed && styles.pressed,
-        ]}
-      >
-        <Ionicons name="add" size={26} color={COLORS.white} />
-        <Text style={styles.fabText}>Add product</Text>
-      </Pressable>
+      <View style={[styles.fabRow, { bottom: insets.bottom + SPACING.lg }]}>
+        <Pressable
+          onPress={handleStartRapidScan}
+          accessibilityRole="button"
+          accessibilityLabel="Scan items to add"
+          style={({ pressed }) => [
+            styles.fab,
+            styles.fabScan,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons name="barcode-outline" size={22} color={COLORS.white} />
+          <Text style={styles.fabText}>Scan items</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setDraft(blankDraft)}
+          accessibilityRole="button"
+          accessibilityLabel="Add product"
+          style={({ pressed }) => [
+            styles.fab,
+            styles.fabAdd,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons name="add" size={24} color={COLORS.primary} />
+          <Text style={[styles.fabText, styles.fabTextAdd]}>Add</Text>
+        </Pressable>
+      </View>
+
+      <BarcodeScannerModal
+        visible={scannerOpen}
+        onScanned={handleRapidScanned}
+        onClose={() => {
+          setScannerOpen(false);
+          setRapidScan(false);
+        }}
+      />
 
       {!!draft && (
         <ProductEditor
@@ -309,7 +457,8 @@ const ProductsScreen = () => {
           saving={saving}
           onChange={handleChangeDraft}
           onSave={handleSave}
-          onClose={() => setDraft(null)}
+          onClose={handleCloseEditor}
+          rapid={rapidScan}
         />
       )}
     </View>
@@ -325,6 +474,24 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   searchInput: { marginBottom: SPACING.sm },
+  importRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: COLORS.primary,
+  },
+  importRowBusy: { opacity: 0.6 },
+  importText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    marginLeft: SPACING.xs,
+  },
   error: {
     color: COLORS.danger,
     fontSize: FONT_SIZES.sm,
@@ -353,27 +520,46 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
   rowAction: { paddingHorizontal: SPACING.xs },
-  fab: {
+  fabRow: {
     position: 'absolute',
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  fab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: SPACING.md,
     paddingRight: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary,
     elevation: 4,
     shadowColor: '#0F172A',
     shadowOpacity: 0.25,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
+  // Scanning is the primary way to stock a grocery shop, so it leads.
+  fabScan: { backgroundColor: COLORS.primary, marginRight: SPACING.sm },
+  fabAdd: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingRight: SPACING.md,
+  },
   fabText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
     marginLeft: SPACING.xs,
+  },
+  fabTextAdd: { color: COLORS.primary },
+  sheetHint: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textLight,
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.md,
   },
   sheetBackdrop: {
     flex: 1,

@@ -11,7 +11,18 @@ export const API_BASE_URL =
 
 export const API_URL = `${API_BASE_URL}/api`;
 
-export const API_TIMEOUT_MS = 15000;
+/**
+ * The free hosting tier spins the server down when idle, and a cold start
+ * takes the better part of a minute. At 15s every first request after a
+ * quiet period failed, which read as the whole app being broken.
+ */
+export const API_TIMEOUT_MS = 30000;
+
+/**
+ * A cold start can outlast even that, so a timed-out read is retried once.
+ * Reads only — replaying a bill or a payment could record it twice.
+ */
+export const API_COLD_START_RETRIES = 1;
 
 export const SEARCH_DEBOUNCE_MS = 300;
 
