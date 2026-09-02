@@ -1,13 +1,6 @@
 import { Formik } from 'formik';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Button from '../../components/Button';
@@ -16,6 +9,7 @@ import Input from '../../components/Input';
 import StateView from '../../components/StateView';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { toBusinessFormValues } from '../../services/businessService';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useProfile } from '../../store/ProfileContext';
 import { buildLetterhead } from '../printing/documentTemplates';
 import {
@@ -70,6 +64,7 @@ const LetterheadPreview = ({ values }) => {
  */
 const BusinessProfileScreen = ({ onboarding = false }) => {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const { profile, loading, saving, error, refresh, saveBusinessProfile } =
     useProfile();
   const [saved, setSaved] = useState(false);
@@ -116,24 +111,24 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
   }
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.fill}
-      // The app runs edge-to-edge on Android, so `adjustResize` no longer
-      // shrinks the window and the default (undefined) behaviour left the
-      // lower fields sitting under the keyboard. `padding` works on both.
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      contentContainerStyle={[
+        styles.content,
+        // Keyboard height when open, otherwise clearance for the Android
+        // gesture bar, which was drawing over the save button. Driven from
+        // the keyboard events because edge-to-edge stops the window from
+        // resizing, which is what KeyboardAvoidingView relies on.
+        {
+          paddingBottom:
+            keyboardHeight > 0
+              ? keyboardHeight + SPACING.md
+              : insets.bottom + SPACING.xl,
+        },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          // Clears the Android gesture/navigation bar, which was drawing on
-          // top of the save button.
-          { paddingBottom: insets.bottom + SPACING.xl },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
         {onboarding && (
           <View style={styles.welcome}>
             <Text style={styles.welcomeTitle}>Set up your bill</Text>
@@ -297,8 +292,7 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
             );
           }}
         </Formik>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 };
 

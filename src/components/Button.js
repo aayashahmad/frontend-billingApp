@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +22,9 @@ const Button = ({
   variant = 'primary',
   loading = false,
   disabled = false,
+  // Optional Ionicons name, drawn before the label. Takes the label's colour
+  // so it stays legible across variants.
+  icon,
   style,
   testID,
 }) => {
@@ -43,12 +47,23 @@ const Button = ({
       ]}
     >
       <View style={styles.content}>
-        {loading && (
+        {loading ? (
           <ActivityIndicator
             size="small"
             color={variant === 'secondary' ? COLORS.primary : COLORS.white}
             style={styles.spinner}
           />
+        ) : (
+          // The icon occupies the spinner's place, so the label does not
+          // shift sideways when an action starts.
+          !!icon && (
+            <Ionicons
+              name={icon}
+              size={18}
+              color={variant === 'secondary' ? COLORS.primary : COLORS.white}
+              style={styles.spinner}
+            />
+          )
         )}
         <Text style={[styles.label, styles[variantStyle.label]]}>{title}</Text>
       </View>

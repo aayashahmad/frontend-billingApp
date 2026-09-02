@@ -3,9 +3,7 @@ import { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,7 +20,9 @@ import Input from '../../components/Input';
 import StateView from '../../components/StateView';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useProducts } from '../../hooks/useProducts';
+import { lookupPublicProduct } from '../../services/productLookupService';
 import { formatCurrency } from '../../utils/money';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -39,17 +39,17 @@ const blankDraft = { id: null, barcode: '', name: '', rate: '' };
  */
 const ProductEditor = ({ draft, saving, onChange, onSave, onClose }) => {
   const [scanning, setScanning] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
   const isEditing = draft.id !== null;
   const canSave =
     draft.barcode.trim() && draft.name.trim() && Number(draft.rate) > 0;
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.sheetBackdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.sheet}>
+      <View style={styles.sheetBackdrop}>
+        {/* Lifted by the keyboard's height — the sheet is bottom-anchored and
+            edge-to-edge stops the window resizing under it. */}
+        <View style={[styles.sheet, { marginBottom: keyboardHeight }]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.sheetTitle}>
               {isEditing ? 'Edit product' : 'Add product'}
@@ -125,14 +125,21 @@ const ProductEditor = ({ draft, saving, onChange, onSave, onClose }) => {
 
           <BarcodeScannerModal
             visible={scanning}
-            onScanned={(code) => {
+            onScanned={async (code) => {
               setScanning(false);
               onChange('barcode', code);
+
+              // Save typing where the public database knows the name. It
+              // has no price, and it never overwrites a name already typed.
+              if (!draft.name.trim()) {
+                const match = await lookupPublicProduct(code);
+                if (match) onChange('name', match.name);
+              }
             }}
             onClose={() => setScanning(false)}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

@@ -1,16 +1,9 @@
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 /** Shared chrome for the login and signup screens. */
 const AuthScreenLayout = ({
@@ -22,55 +15,54 @@ const AuthScreenLayout = ({
   onFooterPress,
 }) => {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
+
+  // Padding rather than KeyboardAvoidingView: the app runs edge-to-edge on
+  // Android, so the window never resizes and that component computes a
+  // zero inset — which is why the lower fields could not be scrolled to.
+  const bottomPadding =
+    keyboardHeight > 0
+      ? keyboardHeight + SPACING.md
+      : insets.bottom + SPACING.xl;
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.flex}
-      // The app runs edge-to-edge on Android, so `adjustResize` no longer
-      // shrinks the window and the default (undefined) behaviour left the
-      // password and button sitting under the keyboard. `padding` works on
-      // both platforms.
-      behavior="padding"
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + SPACING.xl, paddingBottom: bottomPadding },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      // iOS can do this natively; harmless elsewhere.
+      automaticallyAdjustKeyboardInsets={false}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: insets.top + SPACING.xl,
-            paddingBottom: insets.bottom + SPACING.xl,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        <View style={styles.centred}>
-          <View style={styles.header}>
-            <Text style={styles.brand}>Billing</Text>
-            <Text style={styles.title}>{title}</Text>
-            {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-          </View>
-
-          <Card>{children}</Card>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerPrompt}>{footerPrompt}</Text>
-            <Pressable onPress={onFooterPress} accessibilityRole="button">
-              <Text style={styles.footerAction}>{footerAction}</Text>
-            </Pressable>
-          </View>
+      {/* Auto margins centre the form only while it fits. `justifyContent:
+          'center'` on the container would overflow it equally top and bottom
+          once the keyboard shrinks the viewport, putting the top out of
+          reach however far you scrolled. */}
+      <View style={styles.centred}>
+        <View style={styles.header}>
+          <Text style={styles.brand}>Billing</Text>
+          <Text style={styles.title}>{title}</Text>
+          {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <Card>{children}</Card>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerPrompt}>{footerPrompt}</Text>
+          <Pressable onPress={onFooterPress} accessibilityRole="button">
+            <Text style={styles.footerAction}>{footerAction}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
-  // `justifyContent: 'center'` is deliberately absent: once the keyboard
-  // shrinks the viewport the content is taller than the container, and a
-  // centred content container overflows equally top and bottom — leaving the
-  // top unreachable however far you scroll. `marginTop: auto` on the first
-  // child centres it only while it actually fits.
   content: { padding: SPACING.md, flexGrow: 1 },
   centred: { marginTop: 'auto', marginBottom: 'auto', width: '100%' },
   header: { marginBottom: SPACING.lg, alignItems: 'center' },

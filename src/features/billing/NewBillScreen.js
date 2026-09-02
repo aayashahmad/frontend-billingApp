@@ -1,18 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCreateBill } from '../../hooks/useCreateBill';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
 import { billItems, calculateBillTotal } from '../../utils/billing';
@@ -23,6 +17,7 @@ import BillForm from './BillForm';
 
 const NewBillScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const scrollRef = useRef(null);
   const { submitBill, submitting, error, clearError } = useCreateBill();
   const { profile: owner, profileLoaded } = useProfile();
@@ -55,23 +50,24 @@ const NewBillScreen = ({ navigation }) => {
   const handleDismissReceipt = useCallback(() => setLastCreated(null), []);
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
+      ref={scrollRef}
       style={styles.flex}
-      // Android runs edge-to-edge, so `adjustResize` no longer shrinks the
-      // window — `padding` is what keeps fields clear of the keyboard.
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      contentContainerStyle={[
+        styles.content,
+        // Padding from the keyboard's own frame. Android runs edge-to-edge,
+        // so the window never resizes and KeyboardAvoidingView computed a
+        // zero inset — the lower fields stayed under the keyboard.
+        {
+          paddingBottom:
+            keyboardHeight > 0
+              ? keyboardHeight + SPACING.md
+              : insets.bottom + SPACING.lg,
+        },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
-      <ScrollView
-        ref={scrollRef}
-        style={styles.flex}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + SPACING.lg },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
         {!!lastCreated && (
           <Card style={styles.receipt}>
             <Text style={styles.receiptTitle}>Bill created</Text>
@@ -151,8 +147,7 @@ const NewBillScreen = ({ navigation }) => {
           submitError={error}
           onClearSubmitError={clearError}
         />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 };
 

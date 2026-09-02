@@ -24,11 +24,13 @@ const ImagePickerField = ({
   // Named per payment type — a cheque photo is not a "screenshot".
   emptyText = 'No image attached',
 }) => {
-  const [busy, setBusy] = useState(false);
+  // Which action is running, rather than a shared boolean — a single flag
+  // put both buttons into a loading state whichever one was tapped.
+  const [busySource, setBusySource] = useState(null);
 
   const runPicker = useCallback(
-    async (launch, requestPermission, permissionMessage) => {
-      setBusy(true);
+    async (source, launch, requestPermission, permissionMessage) => {
+      setBusySource(source);
       try {
         const permission = await requestPermission();
         if (!permission.granted) {
@@ -47,7 +49,7 @@ const ImagePickerField = ({
           pickerError?.message || 'Please try again.',
         );
       } finally {
-        setBusy(false);
+        setBusySource(null);
       }
     },
     [onChange],
@@ -56,6 +58,7 @@ const ImagePickerField = ({
   const handleTakePhoto = useCallback(
     () =>
       runPicker(
+        'camera',
         ImagePicker.launchCameraAsync,
         ImagePicker.requestCameraPermissionsAsync,
         'Camera access is needed to capture the transaction screenshot.',
@@ -66,6 +69,7 @@ const ImagePickerField = ({
   const handlePickFromLibrary = useCallback(
     () =>
       runPicker(
+        'library',
         ImagePicker.launchImageLibraryAsync,
         ImagePicker.requestMediaLibraryPermissionsAsync,
         'Photo library access is needed to attach the transaction screenshot.',
@@ -106,18 +110,22 @@ const ImagePickerField = ({
         <Button
           title="Take photo"
           variant="secondary"
+          icon="camera-outline"
           onPress={handleTakePhoto}
-          loading={busy}
-          disabled={disabled}
+          loading={busySource === 'camera'}
+          // The other action stays disabled while one is running, so two
+          // pickers can never be opened at once.
+          disabled={disabled || busySource !== null}
           style={styles.action}
         />
         <View style={styles.actionGap} />
         <Button
-          title="Choose from gallery"
+          title="Gallery"
           variant="secondary"
+          icon="images-outline"
           onPress={handlePickFromLibrary}
-          loading={busy}
-          disabled={disabled}
+          loading={busySource === 'library'}
+          disabled={disabled || busySource !== null}
           style={styles.action}
         />
       </View>

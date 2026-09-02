@@ -1,13 +1,5 @@
 import { Formik } from 'formik';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Yup from 'yup';
 
@@ -20,6 +12,7 @@ import {
   PAYMENT_TYPES,
 } from '../../constants/paymentTypes';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useRecordPayment } from '../../hooks/useRecordPayment';
 import { hasPaymentReference } from '../../utils/billing';
 import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
@@ -78,6 +71,7 @@ const buildSchema = (outstanding) =>
  */
 const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const { submitPayment, submitting, error, clearError } = useRecordPayment();
 
   if (!customer) return null;
@@ -91,11 +85,19 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
+      <View style={styles.backdrop}>
+        {/* The sheet sits on the bottom edge, so an open keyboard would cover
+            it outright. Lifting it by the keyboard's own height works under
+            edge-to-edge, where the window never resizes. */}
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: insets.bottom + SPACING.md,
+              marginBottom: keyboardHeight,
+            },
+          ]}
+        >
           <View style={styles.handle} />
 
           <Formik
@@ -238,7 +240,7 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
             }}
           </Formik>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

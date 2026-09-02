@@ -17,6 +17,7 @@ import {
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useCustomerLookup } from '../../hooks/useCustomerLookup';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { lookupPublicProduct } from '../../services/productLookupService';
 import { getProductByBarcode, saveProduct } from '../../services/productService';
 import {
   calculateBillTotal,
@@ -64,25 +65,44 @@ const ItemRow = ({
     setScanning(false);
     setLookup({ status: 'loading' });
 
+    // Own catalogue first — it is the only source with this shop's prices.
+    // Its failure is recorded rather than thrown, so a sleeping backend
+    // still falls through to the public lookup below instead of ending the
+    // scan with an error and no name.
+    let product = null;
+    let catalogueError = null;
     try {
-      const product = await getProductByBarcode(code);
-
-      if (product) {
-        // Known barcode: the catalogue supplies the name and price.
-        onScanResolved(code, product);
-        setLookup({ status: 'matched', name: product.name });
-      } else {
-        // Unknown barcode: leave the fields for the user to fill in. What
-        // they type is saved to the catalogue once the bill goes through, so
-        // the next scan of this code fills itself in.
-        onScanResolved(code, null);
-        setLookup({ status: 'new' });
-      }
+      product = await getProductByBarcode(code);
     } catch (err) {
-      // A failed lookup must not block the sale — the code is still recorded
-      // and the user can type the details by hand.
-      onScanResolved(code, null);
-      setLookup({ status: 'error', message: err.message });
+      catalogueError = err;
+    }
+
+    if (product) {
+      onScanResolved(code, product);
+      setLookup({ status: 'matched', name: product.name });
+      return;
+    }
+
+    // Open Food Facts may still know the name. It carries no price, so the
+    // rate stays for the owner to enter. Whatever they type is saved to the
+    // catalogue after the bill, so the next scan fills itself in completely.
+    const publicMatch = await lookupPublicProduct(code);
+
+    onScanResolved(code, null, publicMatch?.name);
+
+    if (publicMatch) {
+      setLookup({
+        status: 'suggested',
+        name: publicMatch.name,
+        source: publicMatch.attribution,
+      });
+    } else if (catalogueError) {
+      setLookup({
+        status: 'error',
+        message: `Could not reach your products (${catalogueError.message}). Enter the name and rate by hand.`,
+      });
+    } else {
+      setLookup({ status: 'new' });
     }
   };
 
@@ -90,6 +110,8 @@ const ItemRow = ({
     if (!lookup) return null;
     if (lookup.status === 'loading') return 'Looking up barcode…';
     if (lookup.status === 'matched') return `Matched "${lookup.name}" from your products.`;
+    if (lookup.status === 'suggested')
+      return `Name from ${lookup.source} — check it and enter your rate. Saved to your products after the bill.`;
     if (lookup.status === 'new')
       return 'New barcode — enter the name and rate and we will save it for next time.';
     return lookup.message;
@@ -301,7 +323,7 @@ const BillFormFields = ({
    * ones would overwrite the earlier from a stale array.
    */
   const handleScanResolved = useCallback(
-    (index, barcode, product) =>
+    (index, barcode, product, suggestedName) =>
       setFieldValue(
         'items',
         values.items.map((line, position) =>
@@ -310,7 +332,12 @@ const BillFormFields = ({
                 ...line,
                 barcode,
                 isNewProduct: !product,
-                itemName: product ? product.name : line.itemName,
+                // The catalogue wins; a public suggestion only fills a blank
+                // field, so it can never overwrite what the owner typed.
+                itemName:
+                  product?.name ??
+                  (line.itemName?.trim() ? line.itemName : suggestedName ?? line.itemName),
+                // Price is always the shop's own — no public source has it.
                 rate: product ? String(product.rate) : line.rate,
               }
             : line,
@@ -409,8 +436,8 @@ const BillFormFields = ({
           canRemove={values.items.length > 1}
           disabled={submitting}
           onChangeField={(name, value) => handleItemChange(index, name, value)}
-          onScanResolved={(barcode, product) =>
-            handleScanResolved(index, barcode, product)
+          onScanResolved={(barcode, product, suggestedName) =>
+            handleScanResolved(index, barcode, product, suggestedName)
           }
           onBlurField={(name) => handleItemBlur(index, name)}
           onRemove={() => handleRemoveItem(index)}
