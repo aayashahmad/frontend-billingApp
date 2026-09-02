@@ -17,6 +17,7 @@ import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
+import PrinterScreen from '../screens/PrinterScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ProductsScreen from '../screens/ProductsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -32,6 +33,7 @@ const AuthStack = createNativeStackNavigator();
 const NewBillStack = createNativeStackNavigator();
 const CustomersStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
+const PrinterStack = createNativeStackNavigator();
 const ProductsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const BusinessStack = createNativeStackNavigator();
@@ -129,6 +131,16 @@ const ProductsNavigator = () => (
   </ProductsStack.Navigator>
 );
 
+const PrinterNavigator = () => (
+  <PrinterStack.Navigator screenOptions={stackScreenOptions}>
+    <PrinterStack.Screen
+      name="Printer"
+      component={PrinterScreen}
+      options={rootScreenOptions('Printer')}
+    />
+  </PrinterStack.Navigator>
+);
+
 const LegalNavigator = () => (
   <LegalStack.Navigator screenOptions={stackScreenOptions}>
     <LegalStack.Screen
@@ -206,6 +218,11 @@ const MainTabs = () => (
       name="ProductsRoot"
       component={ProductsNavigator}
       options={{ title: 'Products', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="PrinterRoot"
+      component={PrinterNavigator}
+      options={{ title: 'Printer', ...hiddenTab }}
     />
     <Tab.Screen
       name="Profile"

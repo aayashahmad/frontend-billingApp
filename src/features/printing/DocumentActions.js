@@ -14,6 +14,9 @@ const DocumentActions = ({
   label,
   print,
   shareAsPdf,
+  // Optional: only bills can go to a receipt printer, not statements.
+  buildReceipt,
+  printToThermal,
   busy,
   error,
   compact = false,
@@ -26,6 +29,17 @@ const DocumentActions = ({
 
   return (
     <View style={style}>
+      {!!buildReceipt && !!printToThermal && (
+        <Button
+          title="Print receipt"
+          icon="print-outline"
+          onPress={() => printToThermal(buildReceipt)}
+          loading={busy === 'thermal'}
+          disabled={blocked}
+          style={styles.thermal}
+        />
+      )}
+
       <View style={styles.row}>
         <Button
           title="Print"
@@ -54,6 +68,7 @@ const DocumentActions = ({
 };
 
 const styles = StyleSheet.create({
+  thermal: { marginBottom: SPACING.sm },
   row: { flexDirection: 'row' },
   action: { flex: 1 },
   compact: { minHeight: 40 },

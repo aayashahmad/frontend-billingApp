@@ -32,6 +32,7 @@ import {
   buildBillReceiptHtml,
   buildCustomerStatementHtml,
 } from '../printing/documentTemplates';
+import { buildBillReceipt } from '../printing/thermalReceipt';
 
 const keyExtractor = (bill) => String(bill.id);
 
@@ -109,6 +110,10 @@ const CustomerDetailScreen = ({ route, navigation }) => {
             buildHtml={() =>
               buildBillReceiptHtml({ bill: item, customer, owner })
             }
+            buildReceipt={(paperWidth) =>
+              buildBillReceipt({ bill: item, customer, owner, paperWidth })
+            }
+            printToThermal={billDocs.printToThermal}
             print={billDocs.print}
             shareAsPdf={billDocs.shareAsPdf}
             busy={billDocs.busy}

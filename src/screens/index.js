@@ -3,6 +3,7 @@ export { default as CustomerDetailScreen } from './CustomerDetailScreen';
 export { default as LoginScreen } from './LoginScreen';
 export { default as MyCustomersScreen } from './MyCustomersScreen';
 export { default as NewBillScreen } from './NewBillScreen';
+export { default as PrinterScreen } from './PrinterScreen';
 export { default as ProductsScreen } from './ProductsScreen';
 export { default as ProfileScreen } from './ProfileScreen';
 export { default as SearchScreen } from './SearchScreen';

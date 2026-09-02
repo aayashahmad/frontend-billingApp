@@ -1,3 +1,4 @@
+
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,9 +8,6 @@ import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../constants/theme';
 import { useAuth } from '../store/AuthContext';
 import { useProfile } from '../store/ProfileContext';
 
-/** The navy used by the splash and loading screens. */
-const BRAND_DARK = '#0F172A';
-const BRAND_DARK_SOFT = '#1E293B';
 
 /**
  * Drawer destinations, in order. Each one is a route on the tab navigator
@@ -25,6 +23,7 @@ const DRAWER_ITEMS = [
     label: 'Bill Details',
     icon: 'document-text-outline',
   },
+  { route: 'PrinterRoot', label: 'Printer', icon: 'print-outline' },
   { route: 'Profile', label: 'My Profile', icon: 'person-circle-outline' },
   {
     route: 'PrivacyPolicyRoot',
@@ -185,7 +184,7 @@ const styles = StyleSheet.create({
 
   // ── Header ─────────────────────────────────────────────────────────
   header: {
-    backgroundColor: BRAND_DARK,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.lg,
     borderBottomRightRadius: 28,
@@ -197,7 +196,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: '55%',
-    backgroundColor: BRAND_DARK_SOFT,
+    backgroundColor: COLORS.primaryDark,
     borderTopLeftRadius: 40,
   },
   identityRow: { flexDirection: 'row', alignItems: 'center' },
@@ -205,22 +204,22 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
-    // A hairline ring lifts the avatar off the navy without a hard border.
+    // A translucent ring lifts the avatar off the blue without a hard border.
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   avatarText: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.primary,
     letterSpacing: 0.5,
   },
   identityText: { flex: 1, marginLeft: SPACING.md },
   name: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
-  meta: { color: '#94A3B8', fontSize: FONT_SIZES.xs, marginTop: 3 },
+  meta: { color: COLORS.primaryLight, fontSize: FONT_SIZES.xs, marginTop: 3 },
   // A filled pill reads as a control; bare text with a chevron looked like a
   // caption nobody would think to tap.
   profileLink: {
@@ -232,7 +231,7 @@ const styles = StyleSheet.create({
     paddingRight: SPACING.xs,
     paddingVertical: SPACING.xs + 2,
     borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.20)',
   },
   profileLinkText: {
     color: COLORS.white,

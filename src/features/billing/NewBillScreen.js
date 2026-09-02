@@ -13,6 +13,7 @@ import { billItems, calculateBillTotal } from '../../utils/billing';
 import { formatCurrency } from '../../utils/money';
 import DocumentActions from '../printing/DocumentActions';
 import { buildBillReceiptHtml } from '../printing/documentTemplates';
+import { buildBillReceipt } from '../printing/thermalReceipt';
 import BillForm from './BillForm';
 
 const NewBillScreen = ({ navigation }) => {
@@ -115,6 +116,15 @@ const NewBillScreen = ({ navigation }) => {
                   owner,
                 })
               }
+              buildReceipt={(paperWidth) =>
+                buildBillReceipt({
+                  bill: lastCreated.bill,
+                  customer: lastCreated.customer,
+                  owner,
+                  paperWidth,
+                })
+              }
+              printToThermal={receiptDocs.printToThermal}
               print={receiptDocs.print}
               shareAsPdf={receiptDocs.shareAsPdf}
               busy={receiptDocs.busy}

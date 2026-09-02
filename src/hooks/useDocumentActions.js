@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { loadPrinter } from '../services/printerSettings';
 import { printHtml, sharePdf } from '../services/printService';
+import { printBytes } from '../services/thermalPrinterService';
 
 /**
  * Wraps print / share-as-PDF with a single busy flag and error state.
@@ -50,7 +52,29 @@ export const useDocumentActions = () => {
     [run],
   );
 
-  return { print, shareAsPdf, busy, error, clearError };
+  /**
+   * Sends a receipt straight to the configured Bluetooth printer.
+   *
+   * `buildReceipt` is a thunk taking the saved paper width, so the layout is
+   * only rendered once a printer is known to be set up — and rendered for the
+   * width that printer actually has.
+   */
+  const printToThermal = useCallback(
+    (buildReceipt) =>
+      run('thermal', async () => {
+        const printer = await loadPrinter();
+        if (!printer) {
+          throw new Error(
+            'No Bluetooth printer set up yet. Choose one under Printer in the menu.',
+          );
+        }
+        const receipt = buildReceipt(printer.paperWidth);
+        await printBytes(printer.address, receipt.toBase64());
+      }),
+    [run],
+  );
+
+  return { print, shareAsPdf, printToThermal, busy, error, clearError };
 };
 
 export default useDocumentActions;
