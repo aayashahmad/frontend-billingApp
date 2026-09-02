@@ -41,16 +41,22 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
             .typeError('Quantity must be a number')
             .required('Quantity is required')
             .integer('Quantity must be a whole number')
-            .moreThan(0, 'Quantity must be greater than 0'),
+            .moreThan(0, 'Quantity must be greater than 0')
+            // Beyond this the maths silently loses precision — a 20-digit
+            // quantity used to pass validation and corrupt the totals.
+            .max(1000000, 'Quantity is too large'),
 
           rate: Yup.number()
             .transform(emptyStringToUndefined)
             .typeError('Rate must be a number')
             .required('Rate is required')
-            .moreThan(0, 'Rate must be greater than 0'),
+            .moreThan(0, 'Rate must be greater than 0')
+            .max(10000000, 'Rate is too large'),
         }),
       )
       .min(1, 'Add at least one item')
+      // Mirrors the server's MAX_BILL_ITEMS, which rejects longer bills.
+      .max(50, 'A bill can have at most 50 items')
       .required('Add at least one item'),
 
     paymentType: Yup.string()

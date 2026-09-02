@@ -26,9 +26,27 @@ export const getCustomerByPhone = async (phone, { signal } = {}) => {
  * Scoping happens server-side from the bearer token — there is no owner id to
  * pass, and none should be passable.
  */
+/**
+ * The server caps a page at 500 rows; without paging, a shop passing that
+ * size silently lost every row beyond the first page. The loop stops at the
+ * first short page; the ceiling is a runaway guard, not an expected size.
+ */
+const PAGE_SIZE = 500;
+const MAX_PAGES = 20;
+
 export const listCustomers = async ({ signal } = {}) => {
-  const { data } = await api.get('/customers', { signal });
-  return Array.isArray(data) ? data : [];
+  const all = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const { data } = await api.get('/customers', {
+      params: { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+      signal,
+    });
+    const rows = Array.isArray(data) ? data : [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return all;
 };
 
 export const searchCustomers = async (query, { signal } = {}) => {

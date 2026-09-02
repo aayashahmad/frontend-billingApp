@@ -13,7 +13,7 @@ import {
 } from './authValidationSchemas';
 
 const LoginScreen = ({ navigation }) => {
-  const { login, submitting, error, clearError } = useAuth();
+  const { login, submitting, error, sessionNotice, clearError } = useAuth();
 
   const handleSubmit = useCallback(
     async (values) => {
@@ -36,6 +36,7 @@ const LoginScreen = ({ navigation }) => {
       footerAction="Create an account"
       onFooterPress={goToSignup}
     >
+      {!!sessionNotice && <Text style={styles.notice}>{sessionNotice}</Text>}
       <Formik
         initialValues={INITIAL_LOGIN_VALUES}
         validationSchema={loginValidationSchema}
@@ -90,6 +91,16 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  notice: {
+    color: COLORS.warning,
+    backgroundColor: '#FEF3C7',
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 8,
+    marginBottom: SPACING.md,
+  },
   error: {
     color: COLORS.danger,
     fontSize: FONT_SIZES.sm,

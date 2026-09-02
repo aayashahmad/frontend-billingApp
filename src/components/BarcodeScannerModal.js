@@ -96,11 +96,16 @@ const BarcodeScannerModal = ({ visible, onScanned, onClose }) => {
           accessibilityLabel="Close scanner"
           style={({ pressed }) => [
             styles.close,
+            // The translucent-white pill belongs on the dark camera feed; on
+            // the light permission screen it made "Cancel" nearly invisible.
+            !granted && styles.closeOnLight,
             { bottom: insets.bottom + SPACING.lg },
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.closeText}>Cancel</Text>
+          <Text style={[styles.closeText, !granted && styles.closeTextOnLight]}>
+            Cancel
+          </Text>
         </Pressable>
       </View>
     </Modal>
@@ -158,11 +163,17 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
+  closeOnLight: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   closeText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
   },
+  closeTextOnLight: { color: COLORS.primary },
 });
 
 export default BarcodeScannerModal;

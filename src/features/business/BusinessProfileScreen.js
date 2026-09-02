@@ -1,5 +1,5 @@
 import { Formik } from 'formik';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import StateView from '../../components/StateView';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { toBusinessFormValues } from '../../services/businessService';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useKeyboardInputScroll } from '../../hooks/useKeyboardInputScroll';
 import { useProfile } from '../../store/ProfileContext';
 import { buildLetterhead } from '../printing/documentTemplates';
 import {
@@ -65,6 +66,8 @@ const LetterheadPreview = ({ values }) => {
 const BusinessProfileScreen = ({ onboarding = false }) => {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
+  const scrollRef = useRef(null);
+  const handleScroll = useKeyboardInputScroll(scrollRef);
   const { profile, loading, saving, error, refresh, saveBusinessProfile } =
     useProfile();
   const [saved, setSaved] = useState(false);
@@ -112,6 +115,9 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
 
   return (
     <ScrollView
+      ref={scrollRef}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       style={styles.fill}
       contentContainerStyle={[
         styles.content,

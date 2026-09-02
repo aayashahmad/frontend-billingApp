@@ -42,7 +42,7 @@ const CustomerCard = ({ customer, onPress, onPay }) => {
             onPress={handlePay}
             accessibilityRole="button"
             accessibilityLabel={`Take payment from ${customer.name}`}
-            hitSlop={6}
+            hitSlop={10}
             style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
           >
             <Ionicons name="cash-outline" size={16} color={COLORS.white} />

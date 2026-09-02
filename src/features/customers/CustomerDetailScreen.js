@@ -25,7 +25,7 @@ import {
   outstandingAfterPayments,
 } from '../../utils/billing';
 import { formatDateTime } from '../../utils/date';
-import { formatCurrency } from '../../utils/money';
+import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
 import DocumentActions from '../printing/DocumentActions';
 import RecordPaymentModal from './RecordPaymentModal';
 import {
@@ -67,12 +67,17 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     [bills],
   );
 
-  // Payments settle dues without touching any bill, so the figure derived
-  // from the bills alone would keep showing money already handed over.
-  const outstanding = useMemo(
-    () => outstandingAfterPayments(totalUnpaid, payments),
-    [payments, totalUnpaid],
-  );
+  // The server's figure is the only correct one: an overpayment on a later
+  // bill settles earlier dues without touching any bill row, so no sum over
+  // the bills can reproduce it — deriving here once showed money as owed
+  // that had already been handed over. The derived figure remains only as a
+  // fallback for a server old enough to omit the field.
+  const outstanding = useMemo(() => {
+    if (customer?.total_unpaid !== null && customer?.total_unpaid !== undefined) {
+      return Math.max(roundMoney(toNumber(customer.total_unpaid)), 0);
+    }
+    return outstandingAfterPayments(totalUnpaid, payments);
+  }, [customer?.total_unpaid, payments, totalUnpaid]);
 
   const handleOpenBill = useCallback((bill) => setDetailBill(bill), []);
 
@@ -92,9 +97,10 @@ const CustomerDetailScreen = ({ route, navigation }) => {
         bills,
         payments,
         owner,
+        outstanding,
         issuedAt: formatDateTime(new Date().toISOString()),
       }),
-    [bills, customer, owner, payments],
+    [bills, customer, outstanding, owner, payments],
   );
 
   const renderItem = useCallback(
@@ -162,6 +168,26 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.paymentDate}>
                     {formatDateTime(payment.created_at)}
                   </Text>
+                  {/* Payments carry the same screenshot fields as bills, so
+                      the bill viewer works on them unchanged. Until now the
+                      image was collected and then never shown to anyone. */}
+                  {!!payment.transaction_screenshot_url && (
+                    <Pressable
+                      onPress={() => handleViewTransaction(payment)}
+                      accessibilityRole="button"
+                      hitSlop={10}
+                      style={({ pressed }) => [
+                        styles.paymentProof,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.paymentProofText}>
+                        {payment.payment_type === 'cheque'
+                          ? 'View cheque'
+                          : 'View screenshot'}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
                 <Text style={styles.paymentAmount}>
                   {formatCurrency(payment.amount)}
@@ -215,6 +241,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     totalAmount,
     outstanding,
     payments,
+    handleViewTransaction,
   ]);
 
   if (loading && !customer) {
@@ -308,6 +335,12 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   paymentText: { flex: 1, paddingRight: SPACING.sm },
+  paymentProof: { alignSelf: 'flex-start', paddingVertical: SPACING.xs },
+  paymentProofText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
   paymentMethod: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',

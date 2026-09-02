@@ -17,7 +17,7 @@ const PaymentTypeToggle = ({ value, onChange, label, disabled }) => (
             onPress={() => onChange(option.value)}
             disabled={disabled}
             accessibilityRole="radio"
-            accessibilityState={{ selected, disabled: Boolean(disabled) }}
+            accessibilityState={{ checked: selected, selected, disabled: Boolean(disabled) }}
             style={[styles.segment, selected && styles.segmentSelected]}
           >
             <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>

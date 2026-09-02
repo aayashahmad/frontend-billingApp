@@ -40,7 +40,7 @@ const blankDraft = { id: null, barcode: '', name: '', rate: '' };
  * The barcode is only editable while adding — a different barcode is a
  * different product, so an edit changes the name and price and nothing else.
  */
-const ProductEditor = ({ draft, saving, onChange, onSave, onClose, rapid }) => {
+const ProductEditor = ({ draft, saving, error, onChange, onSave, onClose, rapid }) => {
   const [scanning, setScanning] = useState(false);
   const keyboardHeight = useKeyboardHeight();
   const isEditing = draft.id !== null;
@@ -114,6 +114,10 @@ const ProductEditor = ({ draft, saving, onChange, onSave, onClose, rapid }) => {
               keyboardType="decimal-pad"
               editable={!saving}
             />
+
+            {/* The screen-level error banner sits BEHIND this sheet, so a
+                failed save looked like a button that did nothing. */}
+            {!!error && <Text style={styles.sheetError}>{error}</Text>}
 
             <Button
               title={
@@ -453,6 +457,7 @@ const ProductsScreen = () => {
 
       {!!draft && (
         <ProductEditor
+          error={error}
           draft={draft}
           saving={saving}
           onChange={handleChangeDraft}
@@ -491,6 +496,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
     marginLeft: SPACING.xs,
+  },
+  sheetError: {
+    color: COLORS.danger,
+    fontSize: FONT_SIZES.sm,
+    marginBottom: SPACING.sm,
   },
   error: {
     color: COLORS.danger,

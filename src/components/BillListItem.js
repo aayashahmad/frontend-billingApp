@@ -95,16 +95,23 @@ const BillListItem = ({ bill, onPress, onViewTransaction, actions }) => {
               {bill.transaction_number || '—'}
             </Text>
             {canViewTransaction && (
-              <Text
+              <Pressable
                 onPress={handleViewTransaction}
-                suppressHighlighting
                 accessibilityRole="button"
-                style={styles.viewLink}
+                // A bare 12px text was a ~15dp target buried inside the
+                // card's own pressable — padding and slop take it past 44dp.
+                hitSlop={12}
+                style={({ pressed }) => [
+                  styles.viewLinkTarget,
+                  pressed && styles.viewLinkPressed,
+                ]}
               >
-                {bill.payment_type === PAYMENT_TYPES.CHEQUE
-                  ? 'View cheque'
-                  : 'View screenshot'}
-              </Text>
+                <Text style={styles.viewLink}>
+                  {bill.payment_type === PAYMENT_TYPES.CHEQUE
+                    ? 'View cheque'
+                    : 'View screenshot'}
+                </Text>
+              </Pressable>
             )}
           </View>
         )}
@@ -170,6 +177,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textLight,
   },
+  viewLinkTarget: {
+    paddingVertical: SPACING.xs,
+    paddingLeft: SPACING.sm,
+  },
+  viewLinkPressed: { opacity: 0.7 },
   viewLink: {
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',

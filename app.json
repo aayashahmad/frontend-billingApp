@@ -32,7 +32,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logo.png",
+          "image": "./assets/logo-mark.png",
           "backgroundColor": "#0F172A",
           "imageWidth": 180,
           "resizeMode": "contain"

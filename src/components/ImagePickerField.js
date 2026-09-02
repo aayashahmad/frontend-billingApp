@@ -95,6 +95,8 @@ const ImagePickerField = ({
             onPress={handleRemove}
             disabled={disabled}
             accessibilityRole="button"
+            accessibilityLabel="Remove image"
+            hitSlop={10}
             style={styles.removeButton}
           >
             <Text style={styles.removeText}>Remove</Text>

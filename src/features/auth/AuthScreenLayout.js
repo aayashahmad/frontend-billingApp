@@ -1,9 +1,12 @@
+import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useKeyboardInputScroll } from '../../hooks/useKeyboardInputScroll';
 
 /** Shared chrome for the login and signup screens. */
 const AuthScreenLayout = ({
@@ -16,6 +19,8 @@ const AuthScreenLayout = ({
 }) => {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
+  const scrollRef = useRef(null);
+  const handleScroll = useKeyboardInputScroll(scrollRef);
 
   // Padding rather than KeyboardAvoidingView: the app runs edge-to-edge on
   // Android, so the window never resizes and that component computes a
@@ -27,6 +32,9 @@ const AuthScreenLayout = ({
 
   return (
     <ScrollView
+      ref={scrollRef}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       style={styles.flex}
       contentContainerStyle={[
         styles.content,
@@ -41,6 +49,9 @@ const AuthScreenLayout = ({
           'center'` on the container would overflow it equally top and bottom
           once the keyboard shrinks the viewport, putting the top out of
           reach however far you scrolled. */}
+      {/* These screens are light with no header; everywhere else the blue
+          header sits under the status bar and the global light style fits. */}
+      <StatusBar style="dark" />
       <View style={styles.centred}>
         <View style={styles.header}>
           <Text style={styles.brand}>Billing</Text>

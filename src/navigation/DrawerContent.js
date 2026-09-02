@@ -119,11 +119,13 @@ const DrawerContent = (props) => {
               </Text>
               {/* The signed-in person, below the shop they are signing in
                   for — the two are usually different and both matter. */}
-              {!!profile?.username && !!profile?.business_name && (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {profile.username}
-                </Text>
-              )}
+              {!!profile?.username &&
+                !!profile?.business_name &&
+                profile.username !== profile.business_name && (
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {profile.username}
+                  </Text>
+                )}
               {!!contact && (
                 <Text style={styles.meta} numberOfLines={1}>
                   {contact}

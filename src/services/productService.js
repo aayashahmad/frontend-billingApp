@@ -24,12 +24,31 @@ export const getProductByBarcode = async (barcode, { signal } = {}) => {
  * The signed-in owner's catalogue. Scoping happens server-side from the
  * bearer token — there is no owner id to pass, and none should be passable.
  */
+/**
+ * The server caps a page at 500 rows; without paging, a shop passing that
+ * size silently lost every row beyond the first page. The loop stops at the
+ * first short page; the ceiling is a runaway guard, not an expected size.
+ */
+const PAGE_SIZE = 500;
+const MAX_PAGES = 20;
+
 export const listProducts = async (query, { signal } = {}) => {
-  const { data } = await api.get('/products', {
-    params: query ? { q: query } : undefined,
-    signal,
-  });
-  return Array.isArray(data) ? data : [];
+  const all = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const { data } = await api.get('/products', {
+      params: {
+        ...(query ? { q: query } : null),
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      },
+      signal,
+    });
+    const rows = Array.isArray(data) ? data : [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return all;
 };
 
 /** Creates the product, or updates it when the barcode is already known. */

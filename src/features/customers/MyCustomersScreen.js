@@ -145,6 +145,13 @@ const MyCustomersScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      {/* A failed refresh used to vanish silently once data was on screen,
+          leaving stale balances that looked current. */}
+      {!!error && customers.length > 0 && (
+        <Text style={styles.refreshError}>
+          Could not refresh — showing earlier data. Pull down to retry.
+        </Text>
+      )}
       <FlatList
         data={visible}
         keyExtractor={keyExtractor}
@@ -173,6 +180,14 @@ const MyCustomersScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  refreshError: {
+    color: COLORS.danger,
+    backgroundColor: COLORS.dangerLight,
+    fontSize: FONT_SIZES.xs,
+    textAlign: 'center',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+  },
   fill: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: SPACING.md },
   summary: { marginBottom: SPACING.md },

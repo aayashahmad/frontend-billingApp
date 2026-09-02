@@ -285,12 +285,18 @@ export const buildCustomerStatementHtml = ({
   owner,
   issuedAt,
   payments = [],
+  // The server's outstanding figure, when the caller has it. An overpayment
+  // on a later bill settles earlier dues without touching any bill row, so
+  // the sum derived below can overstate what is owed — it stays only as the
+  // fallback for callers without the live figure.
+  outstanding: outstandingOverride,
 }) => {
   const { totalAmount, totalUnpaid } = aggregateBillTotals(bills);
   // Payments settle dues without touching any bill, so a statement that
   // ignored them would bill the customer for money already handed over.
   const paymentsTotal = sumPayments(payments);
-  const outstanding = outstandingAfterPayments(totalUnpaid, payments);
+  const outstanding =
+    outstandingOverride ?? outstandingAfterPayments(totalUnpaid, payments);
 
   const rows = bills.length
     ? bills

@@ -25,7 +25,11 @@ export const AuthProvider = ({ children }) => {
   const [restoring, setRestoring] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // Set only when a live session is rejected by the server, so the login
+  // screen can say WHY the user is suddenly looking at it.
+  const [sessionNotice, setSessionNotice] = useState(null);
   const mountedRef = useRef(true);
+  const sessionRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -36,6 +40,7 @@ export const AuthProvider = ({ children }) => {
 
   const applySession = useCallback((next) => {
     setAuthToken(next?.token ?? null);
+    sessionRef.current = next;
     setSession(next);
   }, []);
 
@@ -59,9 +64,14 @@ export const AuthProvider = ({ children }) => {
     };
   }, [applySession]);
 
-  // A 401 from any request drops the dead session.
+  // A 401 from any request drops the dead session. The notice is set only
+  // when there WAS a session — a wrong password on the login screen also
+  // comes back 401 and must not claim the session expired.
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      if (sessionRef.current) {
+        setSessionNotice('Your session expired. Please sign in again.');
+      }
       applySession(null);
       clearSession();
     });
@@ -73,6 +83,7 @@ export const AuthProvider = ({ children }) => {
       setSubmitting(true);
       setError(null);
       try {
+        setSessionNotice(null);
         const result = await fn(values);
         if (!mountedRef.current) return null;
         const next = { token: result.token, username: result.username };
@@ -109,12 +120,13 @@ export const AuthProvider = ({ children }) => {
       restoring,
       submitting,
       error,
+      sessionNotice,
       login,
       signup,
       logout,
       clearError,
     }),
-    [session, restoring, submitting, error, login, signup, logout, clearError],
+    [session, restoring, submitting, error, sessionNotice, login, signup, logout, clearError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

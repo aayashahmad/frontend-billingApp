@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Formik } from 'formik';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import Button from '../../components/Button';
@@ -211,6 +212,20 @@ const ItemRow = ({
   );
 };
 
+/** Whether the form holds anything a shopkeeper would mind losing. */
+const hasDraftContent = (values) =>
+  Boolean(
+    values.phone?.trim() ||
+      values.customerName?.trim() ||
+      values.amountPaid !== '' ||
+      values.transactionNumber?.trim() ||
+      values.transactionScreenshot ||
+      values.items?.some(
+        (line) =>
+          line.itemName?.trim() || line.qty !== '' || line.rate !== '' || line.barcode,
+      ),
+  );
+
 const BillFormFields = ({
   values,
   errors,
@@ -219,6 +234,7 @@ const BillFormFields = ({
   setFieldValue,
   setFieldTouched,
   handleSubmit,
+  isSubmitting,
   submitting,
   submitError,
   onClearSubmitError,
@@ -263,6 +279,33 @@ const BillFormFields = ({
     };
   }, [debouncedPhone, lookup, setFieldValue]);
 
+  // Android back at the root used to exit instantly, destroying a
+  // half-filled bill without a word. Intercept it only while this screen is
+  // focused AND the form holds something — an empty form keeps the stock
+  // exit behavior. (With the keyboard open, Android consumes back to close
+  // the keyboard before it ever reaches this handler.)
+  const isFocused = useIsFocused();
+  const hasDraft = hasDraftContent(values);
+  useEffect(() => {
+    if (!isFocused || !hasDraft) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      Alert.alert(
+        'Discard this bill?',
+        'The customer and items you have entered will be lost.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => BackHandler.exitApp(),
+          },
+        ],
+      );
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isFocused, hasDraft]);
+
   // Cash and cheque both take an entered amount; online and cheque both
   // take a reference number plus an image.
   const entersAmount = usesEnteredAmount(values.paymentType);
@@ -284,9 +327,12 @@ const BillFormFields = ({
   const handlePhoneChange = useCallback(
     (text) => {
       const digitsOnly = text.replace(/\D/g, '').slice(0, PHONE_MAX_LENGTH);
-      // A new phone means a different customer — allow auto-fill again.
+      // A new phone means a different customer — allow auto-fill again, and
+      // drop the previous customer's dues from the payment ceiling until the
+      // lookup for this number lands.
       nameEditedRef.current = false;
       setFieldValue('phone', digitsOnly);
+      setFieldValue('outstandingBalance', 0);
       if (digitsOnly.length === 0) resetLookup();
     },
     [resetLookup, setFieldValue],
@@ -321,34 +367,30 @@ const BillFormFields = ({
     [setFieldValue],
   );
 
-  /**
-   * Writes a scan onto the line in a single update.
-   *
-   * Field-by-field updates would each rebuild `values.items`, so the later
-   * ones would overwrite the earlier from a stale array.
-   */
+  // The lookup can take many seconds (cold backend), and the form stays
+  // editable meanwhile. Always read the line's CURRENT text through this ref
+  // and write per path — rewriting the whole array from the snapshot captured
+  // when the scan started silently reverted anything typed since.
+  const itemsRef = useRef(values.items);
+  itemsRef.current = values.items;
+
   const handleScanResolved = useCallback(
-    (index, barcode, product, suggestedName) =>
-      setFieldValue(
-        'items',
-        values.items.map((line, position) =>
-          position === index
-            ? {
-                ...line,
-                barcode,
-                isNewProduct: !product,
-                // The catalogue wins; a public suggestion only fills a blank
-                // field, so it can never overwrite what the owner typed.
-                itemName:
-                  product?.name ??
-                  (line.itemName?.trim() ? line.itemName : suggestedName ?? line.itemName),
-                // Price is always the shop's own — no public source has it.
-                rate: product ? String(product.rate) : line.rate,
-              }
-            : line,
-        ),
-      ),
-    [setFieldValue, values.items],
+    (index, barcode, product, suggestedName) => {
+      const line = itemsRef.current[index];
+      if (!line) return;
+      setFieldValue(`items[${index}].barcode`, barcode);
+      setFieldValue(`items[${index}].isNewProduct`, !product);
+      if (product?.name) {
+        // The catalogue wins; it is the only source with this shop's prices.
+        setFieldValue(`items[${index}].itemName`, product.name);
+        setFieldValue(`items[${index}].rate`, String(product.rate));
+      } else if (suggestedName && !line.itemName?.trim()) {
+        // A public suggestion only fills a blank field, so it can never
+        // overwrite what the owner typed.
+        setFieldValue(`items[${index}].itemName`, suggestedName);
+      }
+    },
+    [setFieldValue],
   );
 
   const handleItemBlur = useCallback(
@@ -544,7 +586,9 @@ const BillFormFields = ({
         title="Create bill"
         onPress={handleSubmit}
         loading={submitting}
-        disabled={submitting}
+        // isSubmitting covers the async-validation window before the parent's
+        // `submitting` state has re-rendered — the gap a double-tap slips through.
+        disabled={submitting || isSubmitting}
         style={styles.submitButton}
         testID="submit-bill"
       />
@@ -582,8 +626,11 @@ const BillForm = ({ onSubmitBill, submitting, submitError, onClearSubmitError })
     async (values, helpers) => {
       const result = await onSubmitBill(values);
       if (!result) return;
-      await rememberScannedProducts(values.items);
+      // Reset first: while the catalogue saves ran (one POST per newly
+      // scanned line), the form still held valid values behind a live
+      // button — a second tap in that window recorded the sale twice.
       helpers.resetForm({ values: INITIAL_BILL_VALUES });
+      rememberScannedProducts(values.items);
     },
     [onSubmitBill],
   );

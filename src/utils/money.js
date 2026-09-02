@@ -8,8 +8,13 @@ export const toNumber = (value) => {
 };
 
 /** Round to 2 decimals without float drift (0.1 + 0.2 style artefacts). */
-export const roundMoney = (value) =>
-  Math.round((toNumber(value) + Number.EPSILON) * 100) / 100;
+export const roundMoney = (value) => {
+  // Number.EPSILON only papers over drift below ~4; 4.005 * 100 is
+  // 400.4999… and used to round DOWN. Trimming the product to 12
+  // significant digits removes the drift at every magnitude money reaches.
+  const cents = Number((toNumber(value) * 100).toPrecision(12));
+  return Math.round(cents) / 100;
+};
 
 export const formatCurrency = (value) => {
   const amount = roundMoney(value);

@@ -24,8 +24,15 @@ export const useCreateBill = () => {
 
   const clearError = useCallback(() => setError(null), []);
 
+  // A ref, not state: a double-tap fires the second call before the
+  // `submitting` re-render commits, and a duplicate POST writes a second
+  // bill the server cannot tell apart from the first.
+  const inFlightRef = useRef(false);
+
   const submitBill = useCallback(
     async (values) => {
+      if (inFlightRef.current) return null;
+      inFlightRef.current = true;
       setSubmitting(true);
       setError(null);
 
@@ -40,6 +47,7 @@ export const useCreateBill = () => {
         setError(err.message);
         return null;
       } finally {
+        inFlightRef.current = false;
         if (mountedRef.current) setSubmitting(false);
       }
     },

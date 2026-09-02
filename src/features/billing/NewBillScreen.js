@@ -7,6 +7,7 @@ import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, SPACING } from '../../constants/theme';
 import { useCreateBill } from '../../hooks/useCreateBill';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useKeyboardInputScroll } from '../../hooks/useKeyboardInputScroll';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
 import { billItems, calculateBillTotal } from '../../utils/billing';
@@ -20,6 +21,7 @@ const NewBillScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const scrollRef = useRef(null);
+  const handleScroll = useKeyboardInputScroll(scrollRef);
   const { submitBill, submitting, error, clearError } = useCreateBill();
   const { profile: owner, profileLoaded } = useProfile();
   const receiptDocs = useDocumentActions();
@@ -28,6 +30,9 @@ const NewBillScreen = ({ navigation }) => {
   const handleSubmitBill = useCallback(
     async (values) => {
       clearError();
+      // A print error from the previous receipt would otherwise sit inside
+      // the fresh success card as if it belonged to this bill.
+      receiptDocs.clearError();
       const result = await submitBill(values);
       if (result) {
         setLastCreated(result);
@@ -37,7 +42,7 @@ const NewBillScreen = ({ navigation }) => {
       }
       return result;
     },
-    [clearError, submitBill],
+    [clearError, receiptDocs, submitBill],
   );
 
   const handleViewCustomer = useCallback(() => {
@@ -53,6 +58,8 @@ const NewBillScreen = ({ navigation }) => {
   return (
     <ScrollView
       ref={scrollRef}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       style={styles.flex}
       contentContainerStyle={[
         styles.content,
