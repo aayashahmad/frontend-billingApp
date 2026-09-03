@@ -14,6 +14,7 @@ import StateView from '../components/StateView';
 import { COLORS, FONT_SIZES } from '../constants/theme';
 import BusinessProfileScreen from '../screens/BusinessProfileScreen';
 import CustomerDetailScreen from '../screens/CustomerDetailScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
@@ -260,6 +261,7 @@ const AuthNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
     <AuthStack.Screen name="Signup" component={SignupScreen} />
+    <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
   </AuthStack.Navigator>
 );
 

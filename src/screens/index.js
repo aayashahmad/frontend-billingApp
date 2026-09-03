@@ -1,5 +1,6 @@
 export { default as BusinessProfileScreen } from './BusinessProfileScreen';
 export { default as CustomerDetailScreen } from './CustomerDetailScreen';
+export { default as ForgotPasswordScreen } from './ForgotPasswordScreen';
 export { default as LoginScreen } from './LoginScreen';
 export { default as MyCustomersScreen } from './MyCustomersScreen';
 export { default as NewBillScreen } from './NewBillScreen';

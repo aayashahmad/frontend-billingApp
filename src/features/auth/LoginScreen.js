@@ -1,6 +1,6 @@
 import { Formik } from 'formik';
 import { useCallback } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -26,6 +26,11 @@ const LoginScreen = ({ navigation }) => {
   const goToSignup = useCallback(() => {
     clearError();
     navigation.navigate('Signup');
+  }, [clearError, navigation]);
+
+  const goToForgotPassword = useCallback(() => {
+    clearError();
+    navigation.navigate('ForgotPassword');
   }, [clearError, navigation]);
 
   return (
@@ -74,6 +79,14 @@ const LoginScreen = ({ navigation }) => {
               testID="login-password"
             />
 
+            <Pressable
+              onPress={goToForgotPassword}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.forgot, pressed && styles.pressed]}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+
             {!!error && <Text style={styles.error}>{error}</Text>}
 
             <Button
@@ -91,6 +104,17 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  forgot: {
+    alignSelf: 'flex-end',
+    paddingVertical: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  forgotText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+  },
+  pressed: { opacity: 0.7 },
   notice: {
     color: COLORS.warning,
     backgroundColor: '#FEF3C7',

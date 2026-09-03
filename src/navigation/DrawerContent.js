@@ -181,7 +181,12 @@ const DrawerContent = (props) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.card },
-  scroll: { paddingTop: 0 },
+  // DrawerContentScrollView hard-codes 12dp of horizontal padding (plus any
+  // side safe-area inset) on its content. That left the header floating in a
+  // white gutter instead of filling the panel, so it is zeroed here and each
+  // section carries its own padding. The app is portrait-locked, so the side
+  // insets it also drops are always zero in practice.
+  scroll: { paddingTop: 0, paddingStart: 0, paddingEnd: 0 },
   pressed: { opacity: 0.7 },
 
   // ── Header ─────────────────────────────────────────────────────────
@@ -253,7 +258,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
     marginHorizontal: SPACING.md,
   },
-  items: { paddingHorizontal: SPACING.sm },
+  items: { paddingHorizontal: SPACING.sm },  // + row padding = 16, matching the header
   row: {
     flexDirection: 'row',
     alignItems: 'center',

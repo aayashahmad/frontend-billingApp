@@ -113,6 +113,21 @@ export const AuthProvider = ({ children }) => {
 
   const clearError = useCallback(() => setError(null), []);
 
+  /**
+   * Adopts a session produced outside the login form — the password reset
+   * ends by signing the owner in, rather than returning them to a login
+   * screen to retype the password they just chose.
+   */
+  const adoptSession = useCallback(
+    async (next) => {
+      if (!next?.token) return;
+      setSessionNotice(null);
+      applySession(next);
+      await saveSession(next);
+    },
+    [applySession],
+  );
+
   const value = useMemo(
     () => ({
       username: session?.username ?? null,
@@ -124,9 +139,10 @@ export const AuthProvider = ({ children }) => {
       login,
       signup,
       logout,
+      adoptSession,
       clearError,
     }),
-    [session, restoring, submitting, error, sessionNotice, login, signup, logout, clearError],
+    [session, restoring, submitting, error, sessionNotice, login, signup, logout, adoptSession, clearError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
