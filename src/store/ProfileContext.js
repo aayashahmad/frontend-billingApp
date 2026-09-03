@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import { isCancelled } from '../services/api';
-import { getProfile } from '../services/authService';
+import { getProfile, updateAccount } from '../services/authService';
 import { updateBusinessProfile } from '../services/businessService';
 import { useAuth } from './AuthContext';
 
@@ -92,6 +92,29 @@ export const ProfileProvider = ({ children }) => {
     }
   }, []);
 
+  /**
+   * Saves the owner's own account details. Merged into the cached profile so
+   * the drawer header and documents show the new name immediately.
+   */
+  const saveAccount = useCallback(async (values) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await updateAccount(values);
+      if (!mountedRef.current) return null;
+      setProfile((current) => ({ ...(current ?? {}), ...updated }));
+      return updated;
+    } catch (err) {
+      if (!mountedRef.current || isCancelled(err)) return null;
+      setError(err.message);
+      return null;
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
+
   const value = useMemo(
     () => ({
       // Fall back to the username carried in the token so documents still
@@ -102,13 +125,16 @@ export const ProfileProvider = ({ children }) => {
       error,
       refresh,
       saveBusinessProfile,
+      saveAccount,
+      clearError,
       // Keyed off the *fetched* profile, not the username fallback —
       // otherwise a returning owner would flash the setup screen before
       // /auth/me lands.
       profileLoaded: Boolean(profile),
       needsOnboarding: Boolean(profile) && !profile.onboarded,
     }),
-    [profile, username, loading, saving, error, refresh, saveBusinessProfile],
+    [profile, username, loading, saving, error, refresh, saveBusinessProfile,
+     saveAccount, clearError],
   );
 
   return (

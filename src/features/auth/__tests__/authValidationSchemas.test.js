@@ -1,4 +1,5 @@
 import {
+  createAccountValidationSchema,
   INITIAL_LOGIN_VALUES,
   INITIAL_SIGNUP_VALUES,
   loginValidationSchema,
@@ -110,5 +111,42 @@ describe('signupValidationSchema', () => {
       confirmPassword: 'different',
     });
     expect(paths).toEqual(['confirmPassword']);
+  });
+});
+
+describe('createAccountValidationSchema', () => {
+  const base = {
+    username: 'Shop Owner',
+    email: 'owner@shop.com',
+    phone: '9876543210',
+    currentPassword: '',
+  };
+
+  it('accepts valid details without a password when contacts are unchanged', async () => {
+    const schema = createAccountValidationSchema({ requiresPassword: false });
+    await expect(schema.validate(base)).resolves.toBeTruthy();
+  });
+
+  it('demands the current password once email or phone changes', async () => {
+    const schema = createAccountValidationSchema({ requiresPassword: true });
+    await expect(schema.validate(base)).rejects.toThrow(
+      /Confirm your password/,
+    );
+    await expect(
+      schema.validate({ ...base, currentPassword: 'secret123' }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejects a blank name, bad email and non-numeric phone', async () => {
+    const schema = createAccountValidationSchema();
+    await expect(schema.validate({ ...base, username: '   ' })).rejects.toThrow(
+      /Name is required/,
+    );
+    await expect(schema.validate({ ...base, email: 'nope' })).rejects.toThrow(
+      /valid email/,
+    );
+    await expect(schema.validate({ ...base, phone: '98abc' })).rejects.toThrow(
+      /digits only/,
+    );
   });
 });

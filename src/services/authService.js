@@ -60,3 +60,23 @@ export const resetPassword = async ({ phone, code, newPassword }, { signal } = {
   );
   return { token: data.token, username: data.username };
 };
+
+/**
+ * Updates the signed-in owner's own name, email and phone.
+ *
+ * `currentPassword` is only sent when the email or phone actually changed —
+ * the server demands it for those two because both are credentials.
+ */
+export const updateAccount = async (values, { signal } = {}) => {
+  const { data } = await api.put(
+    '/auth/me',
+    {
+      username: values.username.trim(),
+      email: values.email.trim().toLowerCase(),
+      phone: values.phone.trim(),
+      current_password: values.currentPassword || null,
+    },
+    { signal },
+  );
+  return data;
+};

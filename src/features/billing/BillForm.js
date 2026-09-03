@@ -1,13 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Formik } from 'formik';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  BackHandler,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 
 import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import CustomerSummaryCard from '../../components/CustomerSummaryCard';
+import CustomerSuggestions from './CustomerSuggestions';
 import ImagePickerField from '../../components/ImagePickerField';
 import Input from '../../components/Input';
 import {
@@ -15,8 +24,10 @@ import {
   PAYMENT_TYPES,
   PHONE_MAX_LENGTH,
 } from '../../constants/paymentTypes';
+import { MIN_SEARCH_LENGTH } from '../../constants/config';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useCustomerLookup } from '../../hooks/useCustomerLookup';
+import { useCustomerSearch } from '../../hooks/useCustomerSearch';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { lookupPublicProduct } from '../../services/productLookupService';
 import { getProductByBarcode, saveProduct } from '../../services/productService';
@@ -331,6 +342,7 @@ const BillFormFields = ({
       // drop the previous customer's dues from the payment ceiling until the
       // lookup for this number lands.
       nameEditedRef.current = false;
+      setNameQuery('');
       setFieldValue('phone', digitsOnly);
       setFieldValue('outstandingBalance', 0);
       if (digitsOnly.length === 0) resetLookup();
@@ -338,10 +350,38 @@ const BillFormFields = ({
     [resetLookup, setFieldValue],
   );
 
+  // Typing a name searches the customer book. Kept separate from the field
+  // value so that picking a customer (which fills the field) does not
+  // immediately re-open the list with that customer's own name as the query.
+  const [nameQuery, setNameQuery] = useState('');
+  const {
+    results: nameMatches,
+    loading: searchingByName,
+    error: nameSearchError,
+  } = useCustomerSearch(nameQuery);
+
   const handleNameChange = useCallback(
     (text) => {
       nameEditedRef.current = true;
       setFieldValue('customerName', text);
+      // Digits belong to the phone field's own exact lookup; searching on
+      // them here would offer the same customer twice.
+      setNameQuery(/[a-z]/i.test(text) ? text : '');
+    },
+    [setFieldValue],
+  );
+
+  /** Fills the whole customer block from a picked search result. */
+  const handleSelectCustomer = useCallback(
+    (picked) => {
+      nameEditedRef.current = true;
+      setNameQuery('');
+      setFieldValue('customerName', picked.name);
+      setFieldValue('phone', String(picked.phone ?? ''));
+      // Their dues raise the ceiling on what may be paid against this bill,
+      // exactly as the phone lookup does.
+      setFieldValue('outstandingBalance', picked.total_unpaid ?? 0);
+      Keyboard.dismiss();
     },
     [setFieldValue],
   );
@@ -457,7 +497,7 @@ const BillFormFields = ({
 
       <Input
         label="Customer name"
-        placeholder="Enter customer name"
+        placeholder="Type a name to search, or enter a new one"
         value={values.customerName}
         onChangeText={handleNameChange}
         onBlur={handleBlur('customerName')}
@@ -465,7 +505,22 @@ const BillFormFields = ({
         error={fieldError('customerName')}
         containerStyle={styles.spacedTop}
         editable={!submitting}
+        hint={
+          nameQuery.trim().length >= MIN_SEARCH_LENGTH
+            ? undefined
+            : 'Type at least 2 letters to search your customers.'
+        }
       />
+
+      {nameQuery.trim().length >= MIN_SEARCH_LENGTH && (
+        <CustomerSuggestions
+          results={nameMatches}
+          loading={searchingByName}
+          error={nameSearchError}
+          query={nameQuery}
+          onSelect={handleSelectCustomer}
+        />
+      )}
 
       <Text style={styles.sectionTitle}>
         Items{values.items.length > 1 ? ` (${values.items.length})` : ''}

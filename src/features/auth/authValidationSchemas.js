@@ -78,6 +78,31 @@ export const resetPasswordValidationSchema = Yup.object({
     .oneOf([Yup.ref('password')], 'Passwords do not match'),
 });
 
+/**
+ * Account details form.
+ *
+ * `requiresPassword` is decided by the caller from whether the email or phone
+ * has actually been edited — mirroring the server, which only demands the
+ * password for those two fields.
+ */
+export const createAccountValidationSchema = ({ requiresPassword = false } = {}) =>
+  Yup.object({
+    username: Yup.string().trim().required('Name is required'),
+    email: Yup.string()
+      .trim()
+      .required('Email is required')
+      .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email address'),
+    phone: Yup.string()
+      .trim()
+      .required('Phone number is required')
+      .matches(/^\d+$/, 'Phone number must contain digits only')
+      .min(PHONE_MIN_LENGTH, `Phone number must be at least ${PHONE_MIN_LENGTH} digits`)
+      .max(PHONE_MAX_LENGTH, `Phone number must be at most ${PHONE_MAX_LENGTH} digits`),
+    currentPassword: requiresPassword
+      ? Yup.string().required('Confirm your password to change email or phone')
+      : Yup.string(),
+  });
+
 export const INITIAL_FORGOT_VALUES = Object.freeze({ phone: '' });
 
 export const INITIAL_RESET_VALUES = Object.freeze({
