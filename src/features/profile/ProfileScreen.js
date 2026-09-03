@@ -11,10 +11,15 @@ import { PHONE_MAX_LENGTH } from '../../constants/paymentTypes';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useKeyboardInputScroll } from '../../hooks/useKeyboardInputScroll';
+import { changePassword } from '../../services/authService';
 import { useAuth } from '../../store/AuthContext';
 import { useProfile } from '../../store/ProfileContext';
 import { formatDateTime } from '../../utils/date';
-import { createAccountValidationSchema } from '../auth/authValidationSchemas';
+import {
+  INITIAL_CHANGE_PASSWORD_VALUES,
+  changePasswordValidationSchema,
+  createAccountValidationSchema,
+} from '../auth/authValidationSchemas';
 
 const DetailRow = ({ label, value }) => (
   <View style={styles.row}>
@@ -45,6 +50,31 @@ const ProfileScreen = () => {
 
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Password changing keeps its own state: it talks straight to the service
+  // rather than through the profile cache, since nothing on screen changes.
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+
+  const handleChangePassword = useCallback(async (values, helpers) => {
+    setPasswordBusy(true);
+    setPasswordError(null);
+    try {
+      await changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      });
+      helpers.resetForm();
+      setChangingPassword(false);
+      setPasswordSaved(true);
+    } catch (err) {
+      setPasswordError(err?.message || 'Could not change the password.');
+    } finally {
+      setPasswordBusy(false);
+    }
+  }, []);
 
   const initialValues = useMemo(
     () => ({
@@ -308,12 +338,147 @@ const ProfileScreen = () => {
       {!editing && !!error && <Text style={styles.error}>{error}</Text>}
 
       {!editing && (
-        <Button
-          title="Sign out"
-          variant="danger"
-          onPress={logout}
-          style={styles.signOut}
-        />
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Password</Text>
+            {!changingPassword && (
+              <Pressable
+                onPress={() => {
+                  setPasswordError(null);
+                  setPasswordSaved(false);
+                  setChangingPassword(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Change password"
+                hitSlop={10}
+                style={({ pressed }) => [
+                  styles.editLink,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.editLinkText}>Change</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Card>
+            {changingPassword ? (
+              <Formik
+                initialValues={INITIAL_CHANGE_PASSWORD_VALUES}
+                validationSchema={changePasswordValidationSchema}
+                onSubmit={handleChangePassword}
+                validateOnChange={false}
+              >
+                {({
+                  values,
+                  errors,
+                  touched,
+                  handleBlur,
+                  setFieldValue,
+                  handleSubmit: submit,
+                  resetForm,
+                }) => (
+                  <>
+                    <Input
+                      label="Current password"
+                      placeholder="Your password today"
+                      value={values.currentPassword}
+                      onChangeText={(text) =>
+                        setFieldValue('currentPassword', text)
+                      }
+                      onBlur={handleBlur('currentPassword')}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      error={
+                        touched.currentPassword && errors.currentPassword
+                          ? errors.currentPassword
+                          : undefined
+                      }
+                      editable={!passwordBusy}
+                      testID="current-password"
+                    />
+
+                    <Input
+                      label="New password"
+                      placeholder="At least 6 characters"
+                      value={values.newPassword}
+                      onChangeText={(text) => setFieldValue('newPassword', text)}
+                      onBlur={handleBlur('newPassword')}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      error={
+                        touched.newPassword && errors.newPassword
+                          ? errors.newPassword
+                          : undefined
+                      }
+                      editable={!passwordBusy}
+                      testID="new-password"
+                    />
+
+                    <Input
+                      label="Confirm new password"
+                      placeholder="Re-enter the new password"
+                      value={values.confirmPassword}
+                      onChangeText={(text) =>
+                        setFieldValue('confirmPassword', text)
+                      }
+                      onBlur={handleBlur('confirmPassword')}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      error={
+                        touched.confirmPassword && errors.confirmPassword
+                          ? errors.confirmPassword
+                          : undefined
+                      }
+                      editable={!passwordBusy}
+                      testID="confirm-new-password"
+                    />
+
+                    {!!passwordError && (
+                      <Text style={styles.error}>{passwordError}</Text>
+                    )}
+
+                    <Button
+                      title="Update password"
+                      onPress={submit}
+                      loading={passwordBusy}
+                      disabled={passwordBusy}
+                      testID="submit-password"
+                    />
+                    <Button
+                      title="Cancel"
+                      variant="secondary"
+                      onPress={() => {
+                        resetForm();
+                        setPasswordError(null);
+                        setChangingPassword(false);
+                      }}
+                      disabled={passwordBusy}
+                      style={styles.cancel}
+                    />
+                  </>
+                )}
+              </Formik>
+            ) : (
+              <>
+                {passwordSaved && (
+                  <Text style={styles.saved}>Password updated.</Text>
+                )}
+                <Text style={styles.passwordHint}>
+                  Change it here whenever you like — no email needed. Forgot it
+                  instead? Sign out and use “Forgot password?”.
+                </Text>
+              </>
+            )}
+          </Card>
+
+          <Button
+            title="Sign out"
+            variant="danger"
+            onPress={logout}
+            style={styles.signOut}
+          />
+        </>
       )}
     </ScrollView>
   );
@@ -397,6 +562,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     marginTop: SPACING.sm,
     textAlign: 'center',
+  },
+  passwordHint: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textLight,
+    lineHeight: 20,
   },
   cancel: { marginTop: SPACING.sm },
   signOut: { marginTop: SPACING.xl },

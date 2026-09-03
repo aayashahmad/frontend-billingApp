@@ -78,6 +78,30 @@ export const resetPasswordValidationSchema = Yup.object({
     .oneOf([Yup.ref('password')], 'Passwords do not match'),
 });
 
+/** Changing the password from inside the app, with no email involved. */
+export const changePasswordValidationSchema = Yup.object({
+  currentPassword: Yup.string().required('Enter your current password'),
+  newPassword: Yup.string()
+    .required('Enter a new password')
+    .min(
+      PASSWORD_MIN_LENGTH,
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+    )
+    .notOneOf(
+      [Yup.ref('currentPassword')],
+      'Choose a password different from your current one',
+    ),
+  confirmPassword: Yup.string()
+    .required('Confirm your new password')
+    .oneOf([Yup.ref('newPassword')], 'Passwords do not match'),
+});
+
+export const INITIAL_CHANGE_PASSWORD_VALUES = Object.freeze({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+});
+
 /**
  * Account details form.
  *

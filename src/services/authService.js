@@ -47,6 +47,23 @@ export const requestPasswordReset = async (phone, { signal } = {}) => {
   return { message: data?.message ?? '', emailHint: data?.email_hint ?? null };
 };
 
+/**
+ * Changes the password of the signed-in owner.
+ *
+ * Nothing is emailed: an owner who still knows their password should not
+ * have to wait on a message, so this keeps working even if mail is down.
+ */
+export const changePassword = async (
+  { currentPassword, newPassword },
+  { signal } = {},
+) => {
+  await api.put(
+    '/auth/password',
+    { current_password: currentPassword, new_password: newPassword },
+    { signal },
+  );
+};
+
 /** Finishes the reset. Returns a session, so the owner lands signed in. */
 export const resetPassword = async ({ phone, code, newPassword }, { signal } = {}) => {
   const { data } = await api.post(

@@ -1,4 +1,5 @@
 import {
+  changePasswordValidationSchema,
   createAccountValidationSchema,
   INITIAL_LOGIN_VALUES,
   INITIAL_SIGNUP_VALUES,
@@ -148,5 +149,54 @@ describe('createAccountValidationSchema', () => {
     await expect(schema.validate({ ...base, phone: '98abc' })).rejects.toThrow(
       /digits only/,
     );
+  });
+});
+
+describe('changePasswordValidationSchema', () => {
+  const base = {
+    currentPassword: 'oldpass1',
+    newPassword: 'newpass2',
+    confirmPassword: 'newpass2',
+  };
+
+  it('accepts a valid change', async () => {
+    await expect(
+      changePasswordValidationSchema.validate(base),
+    ).resolves.toBeTruthy();
+  });
+
+  it('requires the current password', async () => {
+    await expect(
+      changePasswordValidationSchema.validate({ ...base, currentPassword: '' }),
+    ).rejects.toThrow(/current password/i);
+  });
+
+  it('rejects a new password that is too short', async () => {
+    await expect(
+      changePasswordValidationSchema.validate({
+        ...base,
+        newPassword: '123',
+        confirmPassword: '123',
+      }),
+    ).rejects.toThrow(/at least 6/);
+  });
+
+  it('rejects reusing the current password', async () => {
+    await expect(
+      changePasswordValidationSchema.validate({
+        currentPassword: 'samepass1',
+        newPassword: 'samepass1',
+        confirmPassword: 'samepass1',
+      }),
+    ).rejects.toThrow(/different from your current/);
+  });
+
+  it('rejects a mismatched confirmation', async () => {
+    await expect(
+      changePasswordValidationSchema.validate({
+        ...base,
+        confirmPassword: 'somethingelse',
+      }),
+    ).rejects.toThrow(/do not match/);
   });
 });
