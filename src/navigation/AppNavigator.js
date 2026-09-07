@@ -7,6 +7,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BrandedLoading from '../components/BrandedLoading';
 import Button from '../components/Button';
@@ -68,6 +69,40 @@ const icon = (name) =>
   function NavIcon({ color, size = 22 }) {
     return <Ionicons name={name} size={size} color={color} />;
   };
+
+/**
+ * A bottom-tab icon.
+ *
+ * Solid when active, outline when not — the convention on both platforms,
+ * and the thing that tells you where you are without reading the label. The
+ * pill behind it gives the active tab a shape rather than just a colour,
+ * which matters on a bar this wide where two tints look similar at a glance.
+ */
+const tabIcon = (outline, filled) =>
+  function TabIcon({ color, focused, size = 22 }) {
+    return (
+      <View style={[tabStyles.iconPill, focused && tabStyles.iconPillActive]}>
+        <Ionicons name={focused ? filled : outline} size={size} color={color} />
+      </View>
+    );
+  };
+
+const tabStyles = StyleSheet.create({
+  iconPill: {
+    width: 46,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPillActive: { backgroundColor: COLORS.primaryLight },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    // The pill already adds height; without this the label crowds it.
+    marginTop: 2,
+  },
+});
 
 const NewBillNavigator = () => (
   <NewBillStack.Navigator screenOptions={stackScreenOptions}>
@@ -198,30 +233,61 @@ const ProfileNavigator = () => (
  */
 const hiddenTab = { tabBarItemStyle: { display: 'none' }, tabBarButton: () => null };
 
-const MainTabs = () => (
-  <Tab.Navigator
-    screenOptions={{
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textLight,
-      tabBarStyle: { backgroundColor: COLORS.card },
-    }}
-  >
-    <Tab.Screen
-      name="NewBillTab"
-      component={NewBillNavigator}
-      options={{ title: 'New Bill', tabBarIcon: icon('receipt-outline') }}
-    />
-    <Tab.Screen
-      name="CustomersTab"
-      component={CustomersNavigator}
-      options={{ title: 'Search', tabBarIcon: icon('search-outline') }}
-    />
-    <Tab.Screen
-      name="MyCustomersRoot"
-      component={MyCustomersNavigator}
-      options={{ title: 'My Customers', ...hiddenTab }}
-    />
+const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarLabelStyle: tabStyles.label,
+        tabBarStyle: {
+          backgroundColor: COLORS.card,
+          // Height follows the device's own gesture area, so the labels are
+          // never squeezed against the home indicator.
+          height: 62 + insets.bottom,
+          paddingBottom: insets.bottom + 6,
+          paddingTop: 6,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: COLORS.border,
+          elevation: 0,
+        },
+      }}
+    >
+      <Tab.Screen
+        name="NewBillTab"
+        component={NewBillNavigator}
+        options={{
+          title: 'New Bill',
+          tabBarIcon: tabIcon('receipt-outline', 'receipt'),
+        }}
+      />
+      <Tab.Screen
+        name="MyCustomersRoot"
+        component={MyCustomersNavigator}
+        options={{
+          title: 'Customers',
+          tabBarIcon: tabIcon('people-outline', 'people'),
+        }}
+      />
+      <Tab.Screen
+        name="ReportsRoot"
+        component={ReportsNavigator}
+        options={{
+          title: 'Reports',
+          tabBarIcon: tabIcon('bar-chart-outline', 'bar-chart'),
+        }}
+      />
+      <Tab.Screen
+        name="CustomersTab"
+        component={CustomersNavigator}
+        options={{
+          title: 'Search',
+          tabBarIcon: tabIcon('search-outline', 'search'),
+        }}
+      />
     <Tab.Screen
       name="BusinessProfileRoot"
       component={BusinessNavigator}
@@ -233,11 +299,6 @@ const MainTabs = () => (
       options={{ title: 'Products', ...hiddenTab }}
     />
     <Tab.Screen
-      name="ReportsRoot"
-      component={ReportsNavigator}
-      options={{ title: 'Reports', ...hiddenTab }}
-    />
-    <Tab.Screen
       name="PrinterRoot"
       component={PrinterNavigator}
       options={{ title: 'Printer', ...hiddenTab }}
@@ -247,13 +308,14 @@ const MainTabs = () => (
       component={ProfileNavigator}
       options={{ title: 'My Profile', ...hiddenTab }}
     />
-    <Tab.Screen
-      name="PrivacyPolicyRoot"
-      component={LegalNavigator}
-      options={{ title: 'Privacy Policy', ...hiddenTab }}
-    />
-  </Tab.Navigator>
-);
+      <Tab.Screen
+        name="PrivacyPolicyRoot"
+        component={LegalNavigator}
+        options={{ title: 'Privacy Policy', ...hiddenTab }}
+      />
+    </Tab.Navigator>
+  );
+};
 
 /**
  * The drawer wraps the tab tree, so the hamburger is reachable from any root
