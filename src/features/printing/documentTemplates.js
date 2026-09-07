@@ -13,7 +13,7 @@ import {
   summariseBill,
 } from '../../utils/billing';
 import { formatDateTime } from '../../utils/date';
-import { formatCurrency } from '../../utils/money';
+import { formatCompactCurrency, formatCurrency } from '../../utils/money';
 import { buildUpiUri, formatWhatsAppNumber } from '../../utils/upi';
 import { qrSvg } from './qr';
 
@@ -559,21 +559,43 @@ export const buildSalesReportHtml = ({ report, owner }) => {
   };
   const periodLabel = periodLabels[report?.period] ?? '';
 
+  // Same axis rounding as the on-screen chart, so the printed page and the
+  // phone do not disagree about where the top of the scale is.
   const peak = Math.max(...buckets.map((b) => Number(b.billed) || 0), 0);
+  const magnitude = peak > 0 ? 10 ** Math.floor(Math.log10(peak)) : 0;
+  const axisMax = peak > 0
+    ? ([1, 2, 2.5, 5, 10].find((c) => peak / magnitude <= c) ?? 10) * magnitude
+    : 0;
+
   const chartHeight = 150;
   const barWidth = 26;
   const gap = 12;
-  const chartWidth = Math.max(buckets.length * (barWidth + gap), 1);
+  const axisGutter = 46;
+  const plotWidth = Math.max(buckets.length * (barWidth + gap), 1);
+  const chartWidth = plotWidth + axisGutter;
+
+  const tickCount = 4;
+  const grid = axisMax > 0
+    ? Array.from({ length: tickCount + 1 }, (_, index) => {
+        const value = (axisMax / tickCount) * index;
+        const y = chartHeight - (value / axisMax) * chartHeight;
+        return `
+        <line x1="${axisGutter}" y1="${y}" x2="${chartWidth}" y2="${y}"
+              stroke="${value === 0 ? '#94A3B8' : '#E2E8F0'}" stroke-width="1" />
+        <text x="${axisGutter - 6}" y="${y + 3}" font-size="9" fill="#94A3B8"
+              text-anchor="end">${escapeHtml(formatCompactCurrency(value))}</text>`;
+      }).join('')
+    : '';
 
   const bars = buckets
     .map((bucket, index) => {
       const billed = Number(bucket.billed) || 0;
       const collected = Math.min(Number(bucket.collected) || 0, billed);
       const due = Math.max(billed - collected, 0);
-      const total = peak > 0 ? (billed / peak) * chartHeight : 0;
+      const total = axisMax > 0 ? (billed / axisMax) * chartHeight : 0;
       const dueHeight = billed > 0 ? (due / billed) * total : 0;
       const collectedHeight = total - dueHeight;
-      const x = index * (barWidth + gap);
+      const x = axisGutter + index * (barWidth + gap);
       const top = chartHeight - total;
 
       return `
@@ -622,6 +644,7 @@ export const buildSalesReportHtml = ({ report, owner }) => {
 
     <div class="section-title">Trend</div>
     <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ${chartWidth} ${chartHeight + 20}" preserveAspectRatio="xMinYMin meet">
+      ${grid}
       ${bars}
     </svg>
     <div class="chart-legend">

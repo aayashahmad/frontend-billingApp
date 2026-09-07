@@ -23,3 +23,27 @@ export const formatCurrency = (value) => {
     maximumFractionDigits: 2,
   })}`;
 };
+
+/**
+ * Short money for places where the full figure will not fit — chart axes and
+ * tick labels, where "₹1,20,000.00" would collide with its neighbour.
+ *
+ * Uses Indian scale words rather than thousands/millions: a shop owner reads
+ * 1.2L faster than 120K, and 12,00,000 is a crore's tenth, not a million.
+ */
+export const formatCompactCurrency = (value) => {
+  const amount = toNumber(value);
+  const sign = amount < 0 ? '-' : '';
+  const size = Math.abs(amount);
+
+  const trim = (num) => {
+    const fixed = num.toFixed(1);
+    // 2.0L reads worse than 2L; keep the decimal only when it says something.
+    return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+  };
+
+  if (size >= 10000000) return `${sign}₹${trim(size / 10000000)}Cr`;
+  if (size >= 100000) return `${sign}₹${trim(size / 100000)}L`;
+  if (size >= 1000) return `${sign}₹${trim(size / 1000)}K`;
+  return `${sign}₹${Math.round(size)}`;
+};

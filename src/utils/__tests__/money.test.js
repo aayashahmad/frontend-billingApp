@@ -1,4 +1,5 @@
-import { formatCurrency, roundMoney, toNumber } from '../money';
+import {
+  formatCompactCurrency, formatCurrency, roundMoney, toNumber } from '../money';
 
 describe('toNumber', () => {
   it('coerces strings and rejects junk', () => {
@@ -37,5 +38,24 @@ describe('formatCurrency', () => {
 
   it('groups Indian style for large amounts', () => {
     expect(formatCurrency(1234567)).toBe('₹12,34,567.00');
+  });
+});
+
+describe('formatCompactCurrency', () => {
+  it('uses Indian scale words a shop owner reads at a glance', () => {
+    expect(formatCompactCurrency(850)).toBe('₹850');
+    expect(formatCompactCurrency(6600)).toBe('₹6.6K');
+    expect(formatCompactCurrency(120000)).toBe('₹1.2L');
+    expect(formatCompactCurrency(25000000)).toBe('₹2.5Cr');
+  });
+
+  it('drops a decimal that says nothing', () => {
+    expect(formatCompactCurrency(2000)).toBe('₹2K');
+    expect(formatCompactCurrency(200000)).toBe('₹2L');
+  });
+
+  it('handles zero and negatives', () => {
+    expect(formatCompactCurrency(0)).toBe('₹0');
+    expect(formatCompactCurrency(-1500)).toBe('-₹1.5K');
   });
 });

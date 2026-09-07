@@ -2,97 +2,160 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
-import { formatCurrency } from '../../utils/money';
+import { formatCompactCurrency, formatCurrency } from '../../utils/money';
 
-const CHART_HEIGHT = 168;
-const BAR_WIDTH = 34;
-const BAR_GAP = 10;
+const PLOT_HEIGHT = 170;
+const BAR_WIDTH = 26;
+const COLUMN_WIDTH = 44;
+const AXIS_WIDTH = 46;
+const TICK_COUNT = 4;
 
 /**
- * Sales per bucket, drawn with plain views.
+ * Rounds an axis maximum up to something a person would choose.
  *
- * No charting library and no SVG runtime: a bar chart is a set of rectangles
- * whose heights are a ratio, and the alternative would be a native dependency
- * that has to survive every future Expo upgrade for the sake of drawing
- * boxes. It also keeps the app installable on builds without extra modules.
+ * A raw peak of 6,600 gives ticks of 1,650 / 3,300 / 4,950 — arithmetically
+ * fine and unreadable. Snapping to 1/2/2.5/5 x a power of ten produces the
+ * round numbers a printed chart would use.
+ */
+export const niceAxisMax = (peak) => {
+  if (!Number.isFinite(peak) || peak <= 0) return 0;
+
+  const magnitude = 10 ** Math.floor(Math.log10(peak));
+  const normalised = peak / magnitude;
+  const step = [1, 2, 2.5, 5, 10].find((candidate) => normalised <= candidate) ?? 10;
+  return step * magnitude;
+};
+
+/**
+ * Sales per bucket.
  *
- * Each column is two stacked segments — what was collected, and what went on
- * the book — so a tall bar that is mostly red reads as "sold plenty, took
- * little" at a glance, which is the thing a shop owner actually wants to see.
+ * Drawn with plain views rather than a charting library: a bar chart is
+ * rectangles whose heights are a ratio, and the alternative is a native
+ * dependency to carry through every Expo upgrade for the sake of drawing
+ * boxes.
+ *
+ * Each column splits into what was collected and what went on the book, so a
+ * tall mostly-red bar reads as "sold plenty, took little" without reading a
+ * single number.
  */
 const SalesChart = ({ buckets = [], selectedIndex, onSelect }) => {
   const scrollRef = useRef(null);
 
   // Jump to the newest data once the bars have a width. Doing this in the ref
   // callback ran before layout, so the chart opened on the oldest columns —
-  // which are usually empty, making a working chart look blank.
+  // usually empty, which made a working chart look blank.
   const handleContentSize = useCallback(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, []);
 
-  const peak = useMemo(
-    () => Math.max(...buckets.map((b) => Number(b.billed) || 0), 0),
+  const axisMax = useMemo(
+    () => niceAxisMax(Math.max(...buckets.map((b) => Number(b.billed) || 0), 0)),
     [buckets],
   );
+
+  const ticks = useMemo(() => {
+    if (axisMax <= 0) return [];
+    return Array.from({ length: TICK_COUNT + 1 }, (_, index) => {
+      const value = (axisMax / TICK_COUNT) * index;
+      return { value, offset: (value / axisMax) * PLOT_HEIGHT };
+    });
+  }, [axisMax]);
 
   if (!buckets.length) return null;
 
   return (
     <View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        ref={scrollRef}
-        // Newest data sits on the right, which is where the eye should land.
-        onContentSizeChange={handleContentSize}
-      >
-        {buckets.map((bucket, index) => {
-          const billed = Number(bucket.billed) || 0;
-          const collected = Math.min(Number(bucket.collected) || 0, billed);
-          const due = Math.max(billed - collected, 0);
-
-          // A bucket with sales always gets a visible sliver, so an empty day
-          // and a quiet day do not look identical.
-          const totalHeight = peak > 0 ? Math.max((billed / peak) * CHART_HEIGHT, billed > 0 ? 3 : 0) : 0;
-          const dueHeight = billed > 0 ? (due / billed) * totalHeight : 0;
-          const collectedHeight = totalHeight - dueHeight;
-          const active = index === selectedIndex;
-
-          return (
-            <Pressable
-              key={`${bucket.label}-${index}`}
-              onPress={() => onSelect?.(index)}
-              accessibilityRole="button"
-              accessibilityLabel={`${bucket.label}: ${formatCurrency(billed)} sold, ${bucket.bills} bills`}
-              style={styles.column}
-            >
-              <View style={styles.barArea}>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: totalHeight },
-                    active && styles.barActive,
-                  ]}
-                >
-                  {due > 0 && (
-                    <View style={[styles.dueSegment, { height: dueHeight }]} />
-                  )}
-                  <View
-                    style={[styles.collectedSegment, { height: collectedHeight }]}
-                  />
-                </View>
-              </View>
-              <Text
-                style={[styles.label, active && styles.labelActive]}
-                numberOfLines={1}
-              >
-                {bucket.label}
+      <View style={styles.chartRow}>
+        {/* Fixed axis: it must not scroll away with the bars, or the numbers
+            stop describing what is on screen. */}
+        <View style={styles.axis}>
+          {ticks
+            .slice()
+            .reverse()
+            .map((tick) => (
+              <Text key={tick.value} style={styles.axisLabel} numberOfLines={1}>
+                {formatCompactCurrency(tick.value)}
               </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+            ))}
+        </View>
+
+        <View style={styles.plot}>
+          {/* Gridlines sit behind the bars and span the visible plot, so they
+              stay put while the bars scroll under them. */}
+          <View style={styles.gridlines} pointerEvents="none">
+            {ticks.map((tick) => (
+              <View
+                key={tick.value}
+                style={[
+                  styles.gridline,
+                  { bottom: tick.offset },
+                  tick.value === 0 && styles.baseline,
+                ]}
+              />
+            ))}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+            ref={scrollRef}
+            onContentSizeChange={handleContentSize}
+          >
+            {buckets.map((bucket, index) => {
+              const billed = Number(bucket.billed) || 0;
+              const collected = Math.min(Number(bucket.collected) || 0, billed);
+              const due = Math.max(billed - collected, 0);
+
+              const total =
+                axisMax > 0
+                  ? Math.max((billed / axisMax) * PLOT_HEIGHT, billed > 0 ? 4 : 0)
+                  : 0;
+              const dueHeight = billed > 0 ? (due / billed) * total : 0;
+              const collectedHeight = total - dueHeight;
+              const active = index === selectedIndex;
+
+              return (
+                <Pressable
+                  key={`${bucket.label}-${index}`}
+                  onPress={() => onSelect?.(index)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${bucket.label}: ${formatCurrency(billed)} sold, ${bucket.bills} bills`}
+                  style={styles.column}
+                >
+                  <View style={styles.barArea}>
+                    {/* A faint track marks every column, so a day with no
+                        sales still reads as a day rather than a gap. */}
+                    <View style={[styles.track, active && styles.trackActive]} />
+
+                    {billed > 0 && (
+                      <View style={[styles.bar, { height: total }]}>
+                        {due > 0 && (
+                          <View style={[styles.dueSegment, { height: dueHeight }]} />
+                        )}
+                        <View
+                          style={[
+                            styles.collectedSegment,
+                            { height: collectedHeight },
+                          ]}
+                        />
+                      </View>
+                    )}
+                  </View>
+
+                  <Text
+                    style={[styles.label, active && styles.labelActive]}
+                    numberOfLines={1}
+                  >
+                    {bucket.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
@@ -109,37 +172,79 @@ const SalesChart = ({ buckets = [], selectedIndex, onSelect }) => {
 };
 
 const styles = StyleSheet.create({
-  scroll: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.xs },
-  column: { width: BAR_WIDTH + BAR_GAP, alignItems: 'center' },
-  barArea: {
-    height: CHART_HEIGHT,
-    justifyContent: 'flex-end',
-    marginBottom: SPACING.xs,
+  chartRow: { flexDirection: 'row' },
+  axis: {
+    width: AXIS_WIDTH,
+    height: PLOT_HEIGHT,
+    justifyContent: 'space-between',
+    // Pulls each label up so it straddles its gridline rather than sitting
+    // below it.
+    marginBottom: 22,
   },
+  axisLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    textAlign: 'right',
+    paddingRight: SPACING.xs,
+    // Half the line height, so the text centres on the line it describes.
+    marginBottom: -6,
+    marginTop: -6,
+  },
+  plot: { flex: 1 },
+  gridlines: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 22,
+    height: PLOT_HEIGHT,
+  },
+  gridline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+  },
+  baseline: { backgroundColor: COLORS.textLight, height: 1 },
+  scroll: { paddingRight: SPACING.sm },
+  column: { width: COLUMN_WIDTH, alignItems: 'center' },
+  barArea: {
+    height: PLOT_HEIGHT,
+    width: BAR_WIDTH,
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.border,
+  },
+  trackActive: { backgroundColor: COLORS.primaryDark },
   bar: {
     width: BAR_WIDTH,
-    borderRadius: RADIUS.sm,
+    // Rounded at the top only: a pill-shaped bar detaches from its baseline.
+    borderTopLeftRadius: RADIUS.sm,
+    borderTopRightRadius: RADIUS.sm,
     overflow: 'hidden',
-    backgroundColor: COLORS.background,
     justifyContent: 'flex-start',
-  },
-  barActive: {
-    borderWidth: 2,
-    borderColor: COLORS.primaryDark,
   },
   dueSegment: { width: '100%', backgroundColor: COLORS.danger },
   collectedSegment: { width: '100%', backgroundColor: COLORS.primary },
   label: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.textLight,
-    width: BAR_WIDTH + BAR_GAP - 2,
+    width: COLUMN_WIDTH,
     textAlign: 'center',
   },
   labelActive: { color: COLORS.primaryDark, fontWeight: '700' },
   legend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: SPACING.xs,
+    marginTop: SPACING.sm,
   },
   legendItem: {
     flexDirection: 'row',
