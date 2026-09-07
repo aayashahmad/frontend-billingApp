@@ -1,4 +1,5 @@
 import {
+  settleWithAdvance,
   aggregateBillTotals,
   billItems,
   calculateBillTotal,
@@ -152,5 +153,64 @@ describe('payments against dues', () => {
 
   it('leaves the balance alone when nothing has been paid', () => {
     expect(outstandingAfterPayments(750, [])).toBe(750);
+  });
+});
+
+describe('settleWithAdvance', () => {
+  it('lets credit settle the bill before the customer is asked for anything', () => {
+    const result = settleWithAdvance({
+      billTotal: 400,
+      amountPaid: 0,
+      advanceBalance: 650,
+    });
+    expect(result.advanceApplied).toBe(400);
+    expect(result.balanceDue).toBe(0);
+    // The rest stays as credit rather than being swallowed by this bill.
+    expect(result.advanceRemaining).toBe(250);
+  });
+
+  it('covers what it can when the advance is smaller than the bill', () => {
+    const result = settleWithAdvance({
+      billTotal: 500,
+      amountPaid: 0,
+      advanceBalance: 350,
+    });
+    expect(result.advanceApplied).toBe(350);
+    expect(result.balanceDue).toBe(150);
+    expect(result.advanceRemaining).toBe(0);
+  });
+
+  it('counts cash handed over alongside the advance', () => {
+    const result = settleWithAdvance({
+      billTotal: 1000,
+      amountPaid: 400,
+      advanceBalance: 300,
+    });
+    expect(result.balanceDue).toBe(300);
+  });
+
+  it('never returns a negative balance when both together exceed the bill', () => {
+    const result = settleWithAdvance({
+      billTotal: 200,
+      amountPaid: 500,
+      advanceBalance: 900,
+    });
+    expect(result.balanceDue).toBe(0);
+  });
+
+  it('behaves like an ordinary bill when there is no advance', () => {
+    expect(
+      settleWithAdvance({ billTotal: 800, amountPaid: 500 }),
+    ).toEqual({ advanceApplied: 0, balanceDue: 300, advanceRemaining: 0 });
+  });
+
+  it('ignores rubbish input rather than producing NaN money', () => {
+    const result = settleWithAdvance({
+      billTotal: '400',
+      amountPaid: null,
+      advanceBalance: undefined,
+    });
+    expect(result.balanceDue).toBe(400);
+    expect(Number.isNaN(result.advanceApplied)).toBe(false);
   });
 });

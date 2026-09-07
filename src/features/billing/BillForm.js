@@ -36,6 +36,7 @@ import {
   calculateItemsTotal,
   calculateUnbalance,
   hasPaymentReference,
+  settleWithAdvance,
   usesEnteredAmount,
 } from '../../utils/billing';
 import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
@@ -328,10 +329,25 @@ const BillFormFields = ({
     [values.items],
   );
 
-  const unbalance = useMemo(
-    () => (entersAmount ? calculateUnbalance(billTotal, values.amountPaid) : 0),
-    [entersAmount, billTotal, values.amountPaid],
+  /**
+   * Credit this customer has already paid ahead, and how much of it this
+   * bill will take. Mirrors the server: the advance settles the bill before
+   * the customer is asked for anything.
+   */
+  const { advanceApplied, balanceDue } = useMemo(
+    () =>
+      settleWithAdvance({
+        billTotal,
+        amountPaid: entersAmount ? values.amountPaid : billTotal,
+        advanceBalance: customer?.advance_balance,
+      }),
+    [billTotal, entersAmount, values.amountPaid, customer?.advance_balance],
   );
+
+  // Counting the advance keeps "Balance due" equal to what the customer is
+  // actually asked for; without it the figure overstates the debt by whatever
+  // they already paid ahead.
+  const unbalance = entersAmount ? balanceDue : 0;
 
   const outstanding = Math.max(toNumber(values.outstandingBalance), 0);
 
@@ -348,7 +364,11 @@ const BillFormFields = ({
     if (limit === null || limit === undefined) return null;
 
     const afterThisBill = roundMoney(
-      outstanding + Math.max(billTotal - toNumber(values.amountPaid), 0),
+      outstanding +
+        Math.max(
+          billTotal - toNumber(values.amountPaid) - advanceApplied,
+          0,
+        ),
     );
     if (afterThisBill <= toNumber(limit)) return null;
 
@@ -357,7 +377,7 @@ const BillFormFields = ({
       after: afterThisBill,
       over: roundMoney(afterThisBill - toNumber(limit)),
     };
-  }, [customer, outstanding, billTotal, values.amountPaid]);
+  }, [customer, outstanding, billTotal, values.amountPaid, advanceApplied]);
 
   const handlePhoneChange = useCallback(
     (text) => {
@@ -606,6 +626,14 @@ const BillFormFields = ({
           <Text style={styles.totalLabel}>Bill total</Text>
           <Text style={styles.totalValue}>{formatCurrency(billTotal)}</Text>
         </View>
+        {advanceApplied > 0 && (
+          <View style={[styles.totalRow, styles.totalRowSpaced]}>
+            <Text style={styles.totalLabel}>Advance applied</Text>
+            <Text style={[styles.totalValue, styles.settled]}>
+              −{formatCurrency(advanceApplied)}
+            </Text>
+          </View>
+        )}
         {entersAmount && (
           <View style={[styles.totalRow, styles.totalRowSpaced]}>
             <Text style={styles.totalLabel}>Balance due</Text>

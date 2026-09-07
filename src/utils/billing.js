@@ -124,3 +124,32 @@ export const aggregateBillTotals = (bills = []) =>
     },
     { totalAmount: 0, totalUnpaid: 0 },
   );
+
+/**
+ * How a bill settles once a customer's advance is taken into account.
+ *
+ * Mirrors the server exactly: credit already paid ahead covers the bill
+ * before the customer is asked for anything, and only what is left over is a
+ * balance due. Kept here as a pure function so the figure on the screen and
+ * the figure the server stores cannot drift apart unnoticed.
+ */
+export const settleWithAdvance = ({
+  billTotal = 0,
+  amountPaid = 0,
+  advanceBalance = 0,
+} = {}) => {
+  const total = Math.max(roundMoney(toNumber(billTotal)), 0);
+  const paid = Math.max(roundMoney(toNumber(amountPaid)), 0);
+  const available = Math.max(roundMoney(toNumber(advanceBalance)), 0);
+
+  // An advance never covers more than the bill in front of it; the remainder
+  // stays as credit rather than being consumed.
+  const advanceApplied = Math.min(available, total);
+  const balanceDue = Math.max(roundMoney(total - paid - advanceApplied), 0);
+
+  return {
+    advanceApplied,
+    balanceDue,
+    advanceRemaining: roundMoney(available - advanceApplied),
+  };
+};
