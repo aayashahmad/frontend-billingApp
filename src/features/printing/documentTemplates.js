@@ -59,6 +59,16 @@ const BASE_STYLES = `
   .pay-qr-caption { font-size: 10px; color: #0F172A; font-weight: 700; margin-top: 6px; }
   .pay-qr-vpa { font-size: 10px; color: #64748B; margin-top: 2px; }
   .pay-table { border-collapse: collapse; }
+  .chart-legend { font-size: 10px; color: #64748B; margin-top: 6px; }
+  .chart-legend .swatch {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    margin: 0 4px 0 12px;
+  }
+  .chart-legend .swatch.collected { background: #2563EB; }
+  .chart-legend .swatch.due { background: #DC2626; }
   .pay-label { color: #64748B; font-size: 11px; padding: 3px 16px 3px 0; }
   .pay-value { font-size: 11px; font-weight: 600; padding: 3px 0; }
   .doc-type {
@@ -523,4 +533,120 @@ export const buildCustomerStatementHtml = ({
   `;
 
   return wrap(`Statement — ${customer?.name ?? ''}`, body);
+};
+
+/**
+ * A period's sales as a printable page.
+ *
+ * The on-screen chart is built from views, which cannot travel into HTML, so
+ * the bars are re-drawn here as SVG rectangles. Same shape, same colours, and
+ * it scales to whatever resolution the printer runs at.
+ */
+export const buildSalesReportHtml = ({ report, owner }) => {
+  const buckets = report?.buckets ?? [];
+  const totals = report?.totals ?? {
+    bills: 0,
+    billed: 0,
+    collected: 0,
+    outstanding: 0,
+  };
+
+  const periodLabels = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    yearly: 'Yearly',
+  };
+  const periodLabel = periodLabels[report?.period] ?? '';
+
+  const peak = Math.max(...buckets.map((b) => Number(b.billed) || 0), 0);
+  const chartHeight = 150;
+  const barWidth = 26;
+  const gap = 12;
+  const chartWidth = Math.max(buckets.length * (barWidth + gap), 1);
+
+  const bars = buckets
+    .map((bucket, index) => {
+      const billed = Number(bucket.billed) || 0;
+      const collected = Math.min(Number(bucket.collected) || 0, billed);
+      const due = Math.max(billed - collected, 0);
+      const total = peak > 0 ? (billed / peak) * chartHeight : 0;
+      const dueHeight = billed > 0 ? (due / billed) * total : 0;
+      const collectedHeight = total - dueHeight;
+      const x = index * (barWidth + gap);
+      const top = chartHeight - total;
+
+      return `
+        <rect x="${x}" y="${top}" width="${barWidth}" height="${dueHeight}" fill="#DC2626" />
+        <rect x="${x}" y="${top + dueHeight}" width="${barWidth}" height="${collectedHeight}" fill="#2563EB" />
+        <text x="${x + barWidth / 2}" y="${chartHeight + 14}" font-size="9" fill="#64748B" text-anchor="middle">${escapeHtml(bucket.label)}</text>`;
+    })
+    .join('');
+
+  const rows = buckets
+    .map(
+      (bucket) => `
+      <tr>
+        <td>${escapeHtml(bucket.label)}</td>
+        <td class="num">${bucket.bills}</td>
+        <td class="num">${formatCurrency(bucket.billed)}</td>
+        <td class="num">${formatCurrency(bucket.collected)}</td>
+        <td class="num ${Number(bucket.outstanding) > 0 ? 'due' : ''}">${formatCurrency(bucket.outstanding)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const body = `
+    ${shopHeader(owner, `${periodLabel} sales report`, formatDateTime(new Date().toISOString()))}
+
+    <table class="totals">
+      <tr>
+        <td class="label">Bills</td>
+        <td class="num">${totals.bills}</td>
+      </tr>
+      <tr>
+        <td class="label">Sold</td>
+        <td class="num">${formatCurrency(totals.billed)}</td>
+      </tr>
+      <tr>
+        <td class="label">Collected</td>
+        <td class="num">${formatCurrency(totals.collected)}</td>
+      </tr>
+      <tr class="grand">
+        <td>Went on the book</td>
+        <td class="num ${Number(totals.outstanding) > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(totals.outstanding)}
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-title">Trend</div>
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ${chartWidth} ${chartHeight + 20}" preserveAspectRatio="xMinYMin meet">
+      ${bars}
+    </svg>
+    <div class="chart-legend">
+      <span class="swatch collected"></span> Collected
+      <span class="swatch due"></span> On the book
+    </div>
+
+    <div class="section-title">Breakdown</div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th class="num">Bills</th>
+          <th class="num">Sold</th>
+          <th class="num">Collected</th>
+          <th class="num">On the book</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="footer">
+      Sales, not profit — this report shows turnover, not margin.
+    </div>
+  `;
+
+  return wrap(`${periodLabel} sales report`, body);
 };

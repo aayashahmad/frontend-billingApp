@@ -21,6 +21,7 @@ import NewBillScreen from '../screens/NewBillScreen';
 import PrinterScreen from '../screens/PrinterScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ProductsScreen from '../screens/ProductsScreen';
+import ReportsScreen from '../screens/ReportsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchScreen from '../screens/SearchScreen';
 import SignupScreen from '../screens/SignupScreen';
@@ -36,6 +37,7 @@ const CustomersStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
 const PrinterStack = createNativeStackNavigator();
 const ProductsStack = createNativeStackNavigator();
+const ReportsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const BusinessStack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
@@ -132,6 +134,16 @@ const ProductsNavigator = () => (
   </ProductsStack.Navigator>
 );
 
+const ReportsNavigator = () => (
+  <ReportsStack.Navigator screenOptions={stackScreenOptions}>
+    <ReportsStack.Screen
+      name="Reports"
+      component={ReportsScreen}
+      options={rootScreenOptions('Reports')}
+    />
+  </ReportsStack.Navigator>
+);
+
 const PrinterNavigator = () => (
   <PrinterStack.Navigator screenOptions={stackScreenOptions}>
     <PrinterStack.Screen
@@ -219,6 +231,11 @@ const MainTabs = () => (
       name="ProductsRoot"
       component={ProductsNavigator}
       options={{ title: 'Products', ...hiddenTab }}
+    />
+    <Tab.Screen
+      name="ReportsRoot"
+      component={ReportsNavigator}
+      options={{ title: 'Reports', ...hiddenTab }}
     />
     <Tab.Screen
       name="PrinterRoot"
