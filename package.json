@@ -20,6 +20,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.3",
     "formik": "^2.4.9",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-native": "0.86.2",
     "react-native-bluetooth-classic": "^1.73.0-rc.17",

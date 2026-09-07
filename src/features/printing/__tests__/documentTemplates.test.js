@@ -300,3 +300,78 @@ describe('multi-item bills', () => {
     expect(html).toContain('>15</td>');
   });
 });
+
+describe('bill payment details', () => {
+  const owner = {
+    business_name: 'Ashu Kirana Store',
+    business_address: '12 Market Road\nSrinagar, JK 190001',
+    business_phone: '9906123456',
+    gstin: '01AAPFU0939F1ZV',
+    upi_id: 'ashubhat@okaxis',
+    bank_account_name: 'Ashu Bhat',
+    bank_account_number: '50100123456789',
+    bank_ifsc: 'HDFC0001234',
+    whatsapp_number: '9906123456',
+    bill_footer_note: 'Goods once sold will not be taken back.',
+  };
+
+  const bill = {
+    id: 12,
+    payment_type: 'cash',
+    amount_paid: 500,
+    bill_total: 835,
+    unbalance: 335,
+    created_at: '2026-09-03T10:00:00',
+    items: [
+      { item_name: 'Rice 5kg', qty: 2, rate: 350, line_total: 700, position: 0 },
+      { item_name: 'Sugar 1kg', qty: 3, rate: 45, line_total: 135, position: 1 },
+    ],
+  };
+
+  const customer = { name: 'Ravi Kumar', phone: '9811100003' };
+
+  it('prints GSTIN and WhatsApp in the letterhead', () => {
+    const html = buildBillReceiptHtml({ bill, customer, owner });
+    expect(html).toContain('GSTIN: 01AAPFU0939F1ZV');
+    expect(html).toContain('WhatsApp: 99061 23456');
+  });
+
+  it('prints a scannable UPI QR carrying the amount still due', () => {
+    const html = buildBillReceiptHtml({ bill, customer, owner });
+    expect(html).toContain('How to pay');
+    expect(html).toContain('Scan to pay by UPI');
+    expect(html).toContain('<svg');
+    expect(html).toContain('ashubhat@okaxis');
+    // Write the rendered bill out so the layout can be eyeballed.
+    require('fs').writeFileSync('/tmp/bill-preview.html', html);
+  });
+
+  it('prints the bank account and IFSC together', () => {
+    const html = buildBillReceiptHtml({ bill, customer, owner });
+    expect(html).toContain('50100123456789');
+    expect(html).toContain('HDFC0001234');
+    expect(html).toContain('Ashu Bhat');
+  });
+
+  it('omits the whole block once the bill is settled', () => {
+    const settled = { ...bill, amount_paid: 835, unbalance: 0 };
+    const html = buildBillReceiptHtml({ bill: settled, customer, owner });
+    expect(html).not.toContain('How to pay');
+    expect(html).not.toContain('Scan to pay by UPI');
+  });
+
+  it('omits bank rows when the shop has given no account', () => {
+    const noBank = { ...owner, bank_account_number: '', bank_ifsc: '' };
+    const html = buildBillReceiptHtml({ bill, customer, owner: noBank });
+    // The UPI half still stands on its own.
+    expect(html).toContain('Scan to pay by UPI');
+    expect(html).not.toContain('IFSC');
+  });
+
+  it('prints nothing extra for a shop that filled in neither', () => {
+    const bare = { business_name: 'Corner Shop' };
+    const html = buildBillReceiptHtml({ bill, customer, owner: bare });
+    expect(html).not.toContain('How to pay');
+    expect(html).not.toContain('GSTIN');
+  });
+});

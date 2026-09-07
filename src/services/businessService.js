@@ -20,6 +20,14 @@ export const updateBusinessProfile = async (values, { signal } = {}) => {
       business_phone: values.businessPhone?.trim() || null,
       business_alt_phone: values.businessAltPhone?.trim() || null,
       registration_number: values.registrationNumber?.trim() || null,
+      // Stored uppercase: both are official identifiers that are printed and
+      // read back, and mixed case invites duplicates that look different.
+      gstin: values.gstin?.trim().toUpperCase() || null,
+      upi_id: values.upiId?.trim() || null,
+      bank_account_name: values.bankAccountName?.trim() || null,
+      bank_account_number: values.bankAccountNumber?.replace(/\s/g, '') || null,
+      bank_ifsc: values.bankIfsc?.trim().toUpperCase() || null,
+      whatsapp_number: values.whatsappNumber?.replace(/\D/g, '') || null,
       bill_footer_note: values.billFooterNote?.trim() || null,
     },
     { signal },
@@ -35,5 +43,11 @@ export const toBusinessFormValues = (profile) => ({
   businessPhone: profile?.business_phone ?? '',
   businessAltPhone: profile?.business_alt_phone ?? '',
   registrationNumber: profile?.registration_number ?? '',
+  gstin: profile?.gstin ?? '',
+  upiId: profile?.upi_id ?? '',
+  bankAccountName: profile?.bank_account_name ?? '',
+  bankAccountNumber: profile?.bank_account_number ?? '',
+  bankIfsc: profile?.bank_ifsc ?? '',
+  whatsappNumber: profile?.whatsapp_number ?? '',
   billFooterNote: profile?.bill_footer_note ?? '',
 });

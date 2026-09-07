@@ -135,6 +135,56 @@ export class EscPosBuilder {
   }
 
   /** Feeds clear of the tear bar, then cuts if the printer has a cutter. */
+  /**
+   * A QR code, rendered by the printer itself.
+   *
+   * The alternative is sending a bitmap, which means encoding the QR here and
+   * pushing thousands of pixel bytes down a serial link. Every ESC/POS printer
+   * with QR support draws it from the text alone: four commands — model, module
+   * size, error correction, store — then print.
+   *
+   * `size` is the module size in dots (1-16). 6 is about 25mm on 58mm paper:
+   * large enough for a phone camera, small enough to leave room for the total.
+   */
+  qr(value, { size = 6, errorCorrection = 'M' } = {}) {
+    const data = String(value ?? '');
+    if (!data) return this;
+
+    // Latin-1 like the rest of the receipt; a UPI URI is ASCII anyway.
+    const bytes = [];
+    for (let index = 0; index < data.length; index += 1) {
+      const code = data.charCodeAt(index);
+      bytes.push(code > 0xff ? 0x3f : code);
+    }
+
+    // GS ( k pL pH cn fn n1 n2 — select model 2.
+    this.raw(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+    // Module size in dots.
+    this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, Math.min(Math.max(size, 1), 16));
+    // Error correction: L/M/Q/H map to 48-51. M survives a smudged receipt
+    // without inflating the code the way H would.
+    const ecc = { L: 48, M: 49, Q: 50, H: 51 }[errorCorrection] ?? 49;
+    this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, ecc);
+
+    // Store the data. The length covers the three bytes cn/fn/m as well.
+    const length = bytes.length + 3;
+    this.raw(
+      0x1d,
+      0x28,
+      0x6b,
+      length & 0xff,
+      (length >> 8) & 0xff,
+      0x31,
+      0x50,
+      0x30,
+      ...bytes,
+    );
+
+    // Print what was stored.
+    this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30);
+    return this;
+  }
+
   cut() {
     return this.feed(4).raw(GS, 0x56, 0x42, 0x00);
   }

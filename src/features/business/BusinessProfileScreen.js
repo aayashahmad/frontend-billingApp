@@ -238,13 +238,93 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
 
                   <Input
                     label="Registration number"
-                    placeholder="e.g. GSTIN 01ABCDE1234F1Z5"
+                    placeholder="Trade licence or shop registration"
                     value={values.registrationNumber}
                     onChangeText={onChange('registrationNumber')}
                     onBlur={handleBlur('registrationNumber')}
                     autoCapitalize="characters"
                     autoCorrect={false}
                     error={fieldError('registrationNumber')}
+                    editable={!saving}
+                  />
+
+                  <Input
+                    label="GSTIN"
+                    placeholder="e.g. 27AAPFU0939F1ZV"
+                    value={values.gstin}
+                    onChangeText={onChange('gstin')}
+                    onBlur={handleBlur('gstin')}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={15}
+                    hint="Printed on every bill. Leave blank if not GST registered."
+                    error={fieldError('gstin')}
+                    editable={!saving}
+                  />
+
+                  <Text style={styles.groupTitle}>How customers pay you</Text>
+
+                  <Input
+                    label="UPI ID"
+                    placeholder="e.g. shop@okaxis"
+                    value={values.upiId}
+                    onChangeText={onChange('upiId')}
+                    onBlur={handleBlur('upiId')}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    hint="A scannable UPI QR is printed on bills that still owe money."
+                    error={fieldError('upiId')}
+                    editable={!saving}
+                  />
+
+                  <Input
+                    label="Account holder name"
+                    placeholder="Name on the bank account"
+                    value={values.bankAccountName}
+                    onChangeText={onChange('bankAccountName')}
+                    onBlur={handleBlur('bankAccountName')}
+                    autoCapitalize="words"
+                    error={fieldError('bankAccountName')}
+                    editable={!saving}
+                  />
+
+                  <Input
+                    label="Account number"
+                    placeholder="Bank account number"
+                    value={values.bankAccountNumber}
+                    onChangeText={onChange('bankAccountNumber')}
+                    onBlur={handleBlur('bankAccountNumber')}
+                    keyboardType="number-pad"
+                    autoCorrect={false}
+                    error={fieldError('bankAccountNumber')}
+                    editable={!saving}
+                  />
+
+                  <Input
+                    label="IFSC code"
+                    placeholder="e.g. SBIN0125620"
+                    value={values.bankIfsc}
+                    onChangeText={onChange('bankIfsc')}
+                    onBlur={handleBlur('bankIfsc')}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={11}
+                    hint="Account number and IFSC print together, so both are needed."
+                    error={fieldError('bankIfsc')}
+                    editable={!saving}
+                  />
+
+                  <Input
+                    label="WhatsApp number"
+                    placeholder="e.g. 9876543210"
+                    value={values.whatsappNumber}
+                    onChangeText={onChange('whatsappNumber')}
+                    onBlur={handleBlur('whatsappNumber')}
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                    hint="Printed on the bill so customers can message about it."
+                    error={fieldError('whatsappNumber')}
                     editable={!saving}
                   />
 
@@ -303,6 +383,15 @@ const BusinessProfileScreen = ({ onboarding = false }) => {
 };
 
 const styles = StyleSheet.create({
+  groupTitle: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
   fill: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.md, paddingBottom: SPACING.xl },
   intro: {

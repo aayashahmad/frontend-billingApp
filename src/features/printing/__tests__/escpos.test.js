@@ -168,3 +168,51 @@ describe('buildTestReceipt', () => {
     out.split('\n').forEach((line) => expect(line.length).toBeLessThanOrEqual(48));
   });
 });
+
+describe('qr', () => {
+  const bytesOf = (builder) =>
+    Array.from(Buffer.from(builder.toBase64(), 'base64'));
+
+  it('emits the four ESC/POS setup commands then prints', () => {
+    const bytes = bytesOf(new EscPosBuilder().qr('upi://pay?pa=shop@ybl'));
+    const hex = bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ');
+
+    // Select model 2, module size, error correction, store, print.
+    expect(hex).toContain('1d 28 6b 04 00 31 41 32 00');
+    expect(hex).toContain('1d 28 6b 03 00 31 43');
+    expect(hex).toContain('1d 28 6b 03 00 31 45 31');
+    expect(hex).toContain('1d 28 6b 03 00 31 51 30');
+  });
+
+  it('sets the stored length to the payload plus the three header bytes', () => {
+    const payload = 'upi://pay?pa=shop@ybl&pn=Shop&cu=INR';
+    const bytes = bytesOf(new EscPosBuilder().qr(payload));
+
+    // Find the store command and read its little-endian length.
+    let index = -1;
+    for (let i = 0; i < bytes.length - 7; i += 1) {
+      if (
+        bytes[i] === 0x1d && bytes[i + 1] === 0x28 && bytes[i + 2] === 0x6b &&
+        bytes[i + 5] === 0x31 && bytes[i + 6] === 0x50
+      ) {
+        index = i;
+        break;
+      }
+    }
+    expect(index).toBeGreaterThan(-1);
+    const length = bytes[index + 3] + (bytes[index + 4] << 8);
+    expect(length).toBe(payload.length + 3);
+  });
+
+  it('clamps the module size to what the command accepts', () => {
+    const big = bytesOf(new EscPosBuilder().qr('x', { size: 99 }));
+    const sizeIndex = big.findIndex(
+      (b, i) => b === 0x31 && big[i + 1] === 0x43,
+    );
+    expect(big[sizeIndex + 2]).toBe(16);
+  });
+
+  it('writes nothing at all for an empty payload', () => {
+    expect(new EscPosBuilder().qr('').toBase64()).toBe('');
+  });
+});

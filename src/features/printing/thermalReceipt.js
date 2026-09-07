@@ -8,6 +8,7 @@ import { formatDateTime } from '../../utils/date';
 import { roundMoney, toNumber } from '../../utils/money';
 import { EscPosBuilder, DEFAULT_PAPER_WIDTH } from './escpos';
 import { buildLetterhead } from './documentTemplates';
+import { buildUpiUri, formatWhatsAppNumber } from '../../utils/upi';
 
 /**
  * Money for a thermal printer.
@@ -56,6 +57,7 @@ export const buildBillReceipt = ({
   head.addressLines.forEach((line) => b.wrap(line));
   if (head.phones.length) b.wrap(head.phones.join(' / '));
   if (head.registrationNumber) b.wrap(`Reg: ${head.registrationNumber}`);
+  if (head.gstin) b.wrap(`GSTIN: ${head.gstin}`);
 
   b.feed(1).align('left').rule();
   b.row('Bill', `#${bill?.id ?? ''}`);
@@ -84,7 +86,43 @@ export const buildBillReceipt = ({
     b.row('Ref', bill.transaction_number);
   }
 
+  // How to settle what is left. Skipped entirely on a paid-up bill: paper is
+  // the one resource a thermal receipt cannot get back.
+  const upiUri =
+    unbalance > 0
+      ? buildUpiUri({
+          upiId: head.upiId,
+          payeeName: head.name,
+          amount: unbalance,
+          note: bill?.id ? `Bill #${bill.id}` : '',
+        })
+      : null;
+  const hasBank = unbalance > 0 && head.bankAccountNumber && head.bankIfsc;
+
+  if (upiUri || hasBank) {
+    b.feed(1).rule();
+    b.align('center').bold(true).line('HOW TO PAY').bold(false);
+
+    if (upiUri) {
+      // Drawn by the printer from the text itself — sending a bitmap would
+      // push thousands of pixel bytes over Bluetooth for the same picture.
+      b.feed(1).qr(upiUri, { size: 6 });
+      b.line('Scan to pay by UPI');
+      if (head.upiId) b.wrap(head.upiId);
+    }
+
+    if (hasBank) {
+      b.align('left').feed(1);
+      if (head.bankAccountName) b.row('A/c name', head.bankAccountName);
+      b.row('A/c no', head.bankAccountNumber);
+      b.row('IFSC', head.bankIfsc);
+    }
+  }
+
   b.feed(1).align('center');
+  if (head.whatsappNumber) {
+    b.wrap(`WhatsApp: ${formatWhatsAppNumber(head.whatsappNumber)}`);
+  }
   b.wrap(head.footerNote || 'Thank you for your business.');
   b.cut();
 

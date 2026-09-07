@@ -14,6 +14,8 @@ import {
 } from '../../utils/billing';
 import { formatDateTime } from '../../utils/date';
 import { formatCurrency } from '../../utils/money';
+import { buildUpiUri, formatWhatsAppNumber } from '../../utils/upi';
+import { qrSvg } from './qr';
 
 /** Values are interpolated into HTML, so every one must be escaped. */
 export const escapeHtml = (value) => {
@@ -45,6 +47,20 @@ const BASE_STYLES = `
   }
   .shop-name { font-size: 22px; font-weight: 700; margin: 0; }
   .shop-meta { color: #64748B; font-size: 11px; margin-top: 4px; line-height: 1.5; }
+  .pay-block {
+    margin-top: 20px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    page-break-inside: avoid;
+  }
+  .pay-body { display: flex; align-items: flex-start; gap: 20px; margin-top: 8px; }
+  .pay-qr { text-align: center; }
+  .pay-qr-caption { font-size: 10px; color: #0F172A; font-weight: 700; margin-top: 6px; }
+  .pay-qr-vpa { font-size: 10px; color: #64748B; margin-top: 2px; }
+  .pay-table { border-collapse: collapse; }
+  .pay-label { color: #64748B; font-size: 11px; padding: 3px 16px 3px 0; }
+  .pay-value { font-size: 11px; font-weight: 600; padding: 3px 0; }
   .doc-type {
     text-align: right;
     font-size: 11px;
@@ -141,6 +157,12 @@ export const buildLetterhead = (owner) => {
     email: owner?.business_email || owner?.email || '',
     phones: [...new Set(phones)],
     registrationNumber: owner?.registration_number || '',
+    gstin: owner?.gstin || '',
+    upiId: owner?.upi_id || '',
+    bankAccountName: owner?.bank_account_name || '',
+    bankAccountNumber: owner?.bank_account_number || '',
+    bankIfsc: owner?.bank_ifsc || '',
+    whatsappNumber: owner?.whatsapp_number || '',
     footerNote: owner?.bill_footer_note || '',
   };
 };
@@ -152,6 +174,12 @@ const shopHeader = (owner, docType, issuedAt) => {
     head.email,
     head.phones.join(' · '),
     head.registrationNumber ? `Reg. No: ${head.registrationNumber}` : '',
+    // A GSTIN identifies the shop for tax; it is the line a business customer
+    // looks for first, so it sits directly under the address.
+    head.gstin ? `GSTIN: ${head.gstin}` : '',
+    head.whatsappNumber
+      ? `WhatsApp: ${formatWhatsAppNumber(head.whatsappNumber)}`
+      : '',
   ].filter(Boolean);
 
   return `
@@ -200,6 +228,73 @@ const wrap = (title, body) => `<!DOCTYPE html>
 </html>`;
 
 /** Single-bill receipt. */
+/**
+ * How to pay what is still owed.
+ *
+ * Only rendered when something is actually outstanding — a settled bill does
+ * not need a QR — and only for the details the shop has filled in, so a shop
+ * with no bank account does not print an empty box.
+ *
+ * The QR encodes the amount due, so the customer scans and confirms rather
+ * than typing a figure they might get wrong.
+ */
+const paymentDetailsBlock = (owner, { amountDue, reference } = {}) => {
+  // Nothing owed, nothing to collect. Without this the QR still renders (a
+  // payee address alone makes a valid UPI link), telling a customer who has
+  // already paid in full how to pay again.
+  if (!(Number(amountDue) > 0)) return '';
+
+  const head = buildLetterhead(owner);
+  const hasBank = Boolean(head.bankAccountNumber && head.bankIfsc);
+  const upiUri = buildUpiUri({
+    upiId: head.upiId,
+    payeeName: head.name,
+    amount: amountDue,
+    note: reference,
+  });
+
+  if (!upiUri && !hasBank) return '';
+
+  const qr = upiUri ? qrSvg(upiUri, { size: 132 }) : '';
+
+  const bankRows = [
+    ['Account name', head.bankAccountName],
+    ['Account number', head.bankAccountNumber],
+    ['IFSC', head.bankIfsc],
+  ]
+    .filter(([, value]) => Boolean(value))
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td class="pay-label">${escapeHtml(label)}</td>
+          <td class="pay-value">${escapeHtml(value)}</td>
+        </tr>`,
+    )
+    .join('');
+
+  return `
+    <div class="pay-block">
+      <div class="section-title">How to pay</div>
+      <div class="pay-body">
+        ${
+          qr
+            ? `<div class="pay-qr">
+                 ${qr}
+                 <div class="pay-qr-caption">Scan to pay by UPI</div>
+                 <div class="pay-qr-vpa">${escapeHtml(head.upiId)}</div>
+               </div>`
+            : ''
+        }
+        ${
+          bankRows
+            ? `<table class="pay-table">${bankRows}</table>`
+            : ''
+        }
+      </div>
+    </div>
+  `;
+};
+
 export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
   const { billTotal, amountPaid, unbalance } = summariseBill(bill);
   const issuedAt = formatDateTime(bill?.created_at);
@@ -269,6 +364,11 @@ export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
         </td>
       </tr>
     </table>
+
+    ${paymentDetailsBlock(owner, {
+      amountDue: unbalance,
+      reference: bill?.id ? `Bill #${bill.id}` : '',
+    })}
 
     <div class="footer">
       ${escapeHtml(buildLetterhead(owner).footerNote || 'Thank you for your business.')}

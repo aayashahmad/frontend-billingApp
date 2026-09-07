@@ -1,5 +1,7 @@
 import * as Yup from 'yup';
 
+import { isValidGstin, isValidIfsc, isValidUpiId } from '../../utils/upi';
+
 /**
  * Letterhead validation.
  *
@@ -38,6 +40,43 @@ export const businessValidationSchema = Yup.object({
     .trim()
     .max(60, 'Registration number is too long'),
 
+  // Every one of these is printed on a bill a customer keeps, and three of
+  // them are official identifiers — a typo in an IFSC sends money nowhere,
+  // and a malformed GSTIN on a tax invoice is a compliance problem.
+  gstin: Yup.string()
+    .trim()
+    .test('optional-gstin', 'Enter a valid 15-character GSTIN', (value) =>
+      !value ? true : isValidGstin(value),
+    ),
+
+  upiId: Yup.string()
+    .trim()
+    .test('optional-upi', 'Enter a valid UPI ID, like shop@okaxis', (value) =>
+      !value ? true : isValidUpiId(value),
+    ),
+
+  bankAccountName: Yup.string()
+    .trim()
+    .max(150, 'Account holder name is too long'),
+
+  bankAccountNumber: Yup.string()
+    .trim()
+    .test('optional-account', 'Account number should be 9 to 18 digits', (value) =>
+      !value ? true : /^\d{9,18}$/.test(value.replace(/\s/g, '')),
+    ),
+
+  bankIfsc: Yup.string()
+    .trim()
+    .test('optional-ifsc', 'Enter a valid IFSC, like SBIN0125620', (value) =>
+      !value ? true : isValidIfsc(value),
+    ),
+
+  whatsappNumber: Yup.string()
+    .trim()
+    .test('optional-whatsapp', 'Enter a valid WhatsApp number', (value) =>
+      !value ? true : /^\d{10,15}$/.test(value.replace(/\D/g, '')),
+    ),
+
   billFooterNote: Yup.string()
     .trim()
     .max(200, 'Footer note is too long for the bill'),
@@ -50,6 +89,12 @@ export const INITIAL_BUSINESS_VALUES = Object.freeze({
   businessPhone: '',
   businessAltPhone: '',
   registrationNumber: '',
+  gstin: '',
+  upiId: '',
+  bankAccountName: '',
+  bankAccountNumber: '',
+  bankIfsc: '',
+  whatsappNumber: '',
   billFooterNote: '',
 });
 
