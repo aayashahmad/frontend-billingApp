@@ -38,7 +38,7 @@ import {
   hasPaymentReference,
   usesEnteredAmount,
 } from '../../utils/billing';
-import { formatCurrency, toNumber } from '../../utils/money';
+import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
 import {
   INITIAL_BILL_VALUES,
   billValidationSchema,
@@ -335,6 +335,30 @@ const BillFormFields = ({
 
   const outstanding = Math.max(toNumber(values.outstandingBalance), 0);
 
+  /**
+   * Whether this bill would push the customer past the credit limit their
+   * shop set for them.
+   *
+   * A warning, never a block: the owner at the counter knows things the app
+   * does not, and refusing to record a sale that happened anyway would put
+   * the ledger out of step with the shelf.
+   */
+  const creditWarning = useMemo(() => {
+    const limit = customer?.credit_limit;
+    if (limit === null || limit === undefined) return null;
+
+    const afterThisBill = roundMoney(
+      outstanding + Math.max(billTotal - toNumber(values.amountPaid), 0),
+    );
+    if (afterThisBill <= toNumber(limit)) return null;
+
+    return {
+      limit: toNumber(limit),
+      after: afterThisBill,
+      over: roundMoney(afterThisBill - toNumber(limit)),
+    };
+  }, [customer, outstanding, billTotal, values.amountPaid]);
+
   const handlePhoneChange = useCallback(
     (text) => {
       const digitsOnly = text.replace(/\D/g, '').slice(0, PHONE_MAX_LENGTH);
@@ -493,6 +517,18 @@ const BillFormFields = ({
           caption="Existing customer"
           style={styles.summary}
         />
+      )}
+
+      {!!creditWarning && (
+        <View style={styles.creditWarning}>
+          <Ionicons name="alert-circle" size={18} color={COLORS.danger} />
+          <Text style={styles.creditWarningText}>
+            This bill takes {customer?.name || 'this customer'} to{' '}
+            {formatCurrency(creditWarning.after)} owed —{' '}
+            {formatCurrency(creditWarning.over)} over their{' '}
+            {formatCurrency(creditWarning.limit)} limit.
+          </Text>
+        </View>
       )}
 
       <Input
@@ -711,6 +747,21 @@ const BillForm = ({ onSubmitBill, submitting, submitError, onClearSubmitError })
 };
 
 const styles = StyleSheet.create({
+  creditWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.dangerLight,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  creditWarningText: {
+    flex: 1,
+    color: COLORS.danger,
+    fontSize: FONT_SIZES.sm,
+    lineHeight: 19,
+    marginLeft: SPACING.sm,
+  },
   spacedTop: { marginTop: SPACING.md },
   pressed: { opacity: 0.7 },
   sectionTitle: {

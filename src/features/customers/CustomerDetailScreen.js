@@ -13,11 +13,13 @@ import BillDetailModal from '../../components/BillDetailModal';
 import BillListItem from '../../components/BillListItem';
 import Card from '../../components/Card';
 import CustomerSummaryCard from '../../components/CustomerSummaryCard';
+import CreditLimitCard from './CreditLimitCard';
 import StateView from '../../components/StateView';
 import { PAYMENT_TYPE_LABELS } from '../../constants/paymentTypes';
 import TransactionImageModal from '../../components/TransactionImageModal';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
+import { updateCreditLimit } from '../../services/customerService';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
 import {
@@ -40,6 +42,29 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   const { customerId, customerName } = route.params;
   const { customer, loading, refreshing, error, refresh } =
     useCustomerDetail(customerId);
+
+  // Saving the limit is local to this screen: it changes shop policy, not
+  // the ledger, so it does not belong in the detail hook's fetch cycle.
+  const [savingLimit, setSavingLimit] = useState(false);
+  const [limitError, setLimitError] = useState(null);
+
+  const handleSaveCreditLimit = useCallback(
+    async (limit) => {
+      setSavingLimit(true);
+      setLimitError(null);
+      try {
+        await updateCreditLimit(customerId, limit);
+        await refresh();
+        return true;
+      } catch (err) {
+        setLimitError(err?.message || 'Could not save the limit.');
+        return false;
+      } finally {
+        setSavingLimit(false);
+      }
+    },
+    [customerId, refresh],
+  );
   const { profile: owner, profileLoaded } = useProfile();
   // Two separate selections: opening the payment image from inside the detail
   // sheet must not close the sheet underneath it.
@@ -220,6 +245,13 @@ const CustomerDetailScreen = ({ route, navigation }) => {
           disabled={!profileLoaded}
           style={styles.statementActions}
         />
+        <CreditLimitCard
+          customer={customer}
+          saving={savingLimit}
+          error={limitError}
+          onSave={handleSaveCreditLimit}
+        />
+
         <Text style={styles.sectionTitle}>
           Bill history{bills.length ? ` (${bills.length})` : ''}
         </Text>
@@ -242,6 +274,9 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     outstanding,
     payments,
     handleViewTransaction,
+    savingLimit,
+    limitError,
+    handleSaveCreditLimit,
   ]);
 
   if (loading && !customer) {

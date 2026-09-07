@@ -61,3 +61,20 @@ export const getCustomerById = async (customerId, { signal } = {}) => {
   const { data } = await api.get(`/customers/${customerId}`, { signal });
   return data;
 };
+
+/**
+ * Sets or clears how much a customer may owe at once.
+ *
+ * `limit` of null clears it, which the API needs told explicitly — an absent
+ * value means "leave it alone", and the two must not be confused. A limit of
+ * 0 is a real setting: cash only.
+ */
+export const updateCreditLimit = async (customerId, limit, { signal } = {}) => {
+  const body =
+    limit === null || limit === undefined
+      ? { clear_credit_limit: true }
+      : { credit_limit: Number(limit) };
+
+  const { data } = await api.put(`/customers/${customerId}`, body, { signal });
+  return data;
+};
