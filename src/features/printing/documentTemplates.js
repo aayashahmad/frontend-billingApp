@@ -505,6 +505,15 @@ export const buildCustomerStatementHtml = ({
       </tr>
     </table>
 
+    ${paymentDetailsBlock(owner, {
+      // The statement's whole point is the running balance, so the QR carries
+      // the total owed rather than any single bill's share of it.
+      amountDue: outstanding,
+      // ASCII only: the note travels in the UPI URI, and some apps balk at
+      // multi-byte characters there. An em dash would arrive as %E2%80%94.
+      reference: customer?.name ? `Dues ${customer.name}` : 'Dues',
+    })}
+
     <div class="footer">
       ${escapeHtml(
         buildLetterhead(owner).footerNote ||

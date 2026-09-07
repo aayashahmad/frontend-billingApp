@@ -105,3 +105,22 @@ describe('buildWhatsAppLink', () => {
     expect(formatWhatsAppNumber('919876543210')).toBe('+91 98765 43210');
   });
 });
+
+describe('note sanitising', () => {
+  it('strips characters that would travel as multi-byte escapes', () => {
+    const uri = buildUpiUri({
+      upiId: 'shop@ybl',
+      payeeName: 'Shop',
+      note: 'Dues — Ravi ₹335',
+    });
+    // An em dash would arrive as %E2%80%94 and a rupee sign as %E2%82%B9.
+    expect(uri).not.toContain('%E2%80%94');
+    expect(uri).not.toContain('%E2%82%B9');
+    expect(uri).toContain('tn=Dues%20Ravi%20335');
+  });
+
+  it('keeps ordinary punctuation that UPI apps accept', () => {
+    const uri = buildUpiUri({ upiId: 'shop@ybl', payeeName: 'Shop', note: 'Bill #12' });
+    expect(uri).toContain('tn=Bill%20%2312');
+  });
+});

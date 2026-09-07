@@ -375,3 +375,46 @@ describe('bill payment details', () => {
     expect(html).not.toContain('GSTIN');
   });
 });
+
+describe('statement payment details', () => {
+  const owner = {
+    business_name: 'Ashu Kirana Store',
+    gstin: '01AAPFU0939F1ZV',
+    upi_id: 'ashubhat@okaxis',
+    bank_account_name: 'Ashu Bhat',
+    bank_account_number: '50100123456789',
+    bank_ifsc: 'HDFC0001234',
+    whatsapp_number: '9906123456',
+  };
+  const customer = { name: 'Ravi Kumar', phone: '9811100003', total_unpaid: 335 };
+  const bills = [
+    {
+      id: 1,
+      bill_total: 835,
+      amount_paid: 500,
+      unbalance: 335,
+      payment_type: 'cash',
+      created_at: '2026-09-03T10:00:00',
+      items: [{ item_name: 'Rice 5kg', qty: 2, rate: 350, line_total: 700 }],
+    },
+  ];
+
+  it('shows how to pay the running balance, not one bill', () => {
+    const html = buildCustomerStatementHtml({ customer, bills, owner });
+    expect(html).toContain('How to pay');
+    expect(html).toContain('Scan to pay by UPI');
+    expect(html).toContain('50100123456789');
+    expect(html).toContain('HDFC0001234');
+  });
+
+  it('drops the block once the customer owes nothing', () => {
+    const settled = [{ ...bills[0], amount_paid: 835, unbalance: 0 }];
+    const html = buildCustomerStatementHtml({
+      customer: { ...customer, total_unpaid: 0 },
+      bills: settled,
+      owner,
+      outstanding: 0,
+    });
+    expect(html).not.toContain('How to pay');
+  });
+});

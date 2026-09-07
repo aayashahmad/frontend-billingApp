@@ -58,7 +58,13 @@ export const buildUpiUri = ({ upiId, payeeName, amount, note } = {}) => {
     params.push(['am', value.toFixed(2)]);
   }
 
-  const cleanNote = String(note || '').trim();
+  // Stripped to ASCII: the note is carried in the URI and some UPI apps
+  // reject multi-byte characters there, so a stray dash or rupee sign in a
+  // customer's name must not be able to break the payment link.
+  const cleanNote = String(note || '')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (cleanNote) params.push(['tn', cleanNote.slice(0, 50)]);
 
   return `upi://pay?${params
