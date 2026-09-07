@@ -16,6 +16,9 @@ const CustomerSummaryCard = ({
   // otherwise fall back to the server-maintained running totals.
   const amount = toNumber(totalAmount ?? customer?.total_amount);
   const unpaid = toNumber(totalUnpaid ?? customer?.total_unpaid);
+  // A customer never owes and holds credit at once, so one figure describes
+  // the relationship — showing both would be two contradictory statements.
+  const advance = toNumber(customer?.advance_balance);
   const isSettled = unpaid <= 0;
 
   return (
@@ -34,19 +37,27 @@ const CustomerSummaryCard = ({
           <Text style={styles.metricValue}>{formatCurrency(amount)}</Text>
         </View>
         <View style={[styles.metric, styles.metricRight]}>
-          <Text style={styles.metricLabel}>Unpaid balance</Text>
+          <Text style={styles.metricLabel}>
+            {advance > 0 ? 'Advance held' : 'Unpaid balance'}
+          </Text>
           <Text
             style={[
               styles.metricValue,
-              isSettled ? styles.settled : styles.due,
+              advance > 0 || isSettled ? styles.settled : styles.due,
             ]}
           >
-            {formatCurrency(unpaid)}
+            {formatCurrency(advance > 0 ? advance : unpaid)}
           </Text>
         </View>
       </View>
 
-      {isSettled && <Text style={styles.settledNote}>All bills settled</Text>}
+      {advance > 0 ? (
+        <Text style={styles.settledNote}>
+          Paid ahead — applied to their next bill
+        </Text>
+      ) : (
+        isSettled && <Text style={styles.settledNote}>All bills settled</Text>
+      )}
     </Card>
   );
 };

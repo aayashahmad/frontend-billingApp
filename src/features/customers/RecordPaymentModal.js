@@ -31,10 +31,10 @@ const buildSchema = (outstanding) =>
       .typeError('Amount must be a number')
       .required('Amount is required')
       .moreThan(0, 'Amount must be greater than 0')
-      .max(
-        outstanding,
-        `Cannot pay more than the ${formatCurrency(outstanding)} outstanding`,
-      ),
+      // No ceiling any more: paying over the debt is normal — a round figure
+      // handed over, or money put by before a festival — and the surplus is
+      // held as an advance rather than refused.
+      .max(999999999, 'That amount is too large'),
 
     paymentType: Yup.string()
       .required('Payment type is required')
@@ -164,7 +164,13 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
                     onBlur={handleBlur('amount')}
                     keyboardType="decimal-pad"
                     error={fieldError('amount')}
-                    hint={`Leaves ${formatCurrency(remaining)} outstanding.`}
+                    hint={
+                      toNumber(values.amount) > outstanding
+                        ? `Clears the balance and keeps ${formatCurrency(
+                            toNumber(values.amount) - outstanding,
+                          )} as advance.`
+                        : `Leaves ${formatCurrency(remaining)} outstanding.`
+                    }
                     editable={!submitting}
                   />
 
