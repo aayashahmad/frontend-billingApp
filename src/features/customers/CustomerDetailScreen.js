@@ -196,7 +196,8 @@ const CustomerDetailScreen = ({ route, navigation }) => {
               Payments received ({payments.length})
             </Text>
             {payments.map((payment) => (
-              <View key={payment.id} style={styles.paymentRow}>
+              <View key={payment.id} style={styles.paymentEntry}>
+                <View style={styles.paymentRow}>
                 <View style={styles.paymentText}>
                   <Text style={styles.paymentMethod}>
                     {PAYMENT_TYPE_LABELS[payment.payment_type] ??
@@ -211,28 +212,6 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                   {/* Payments carry the same screenshot fields as bills, so
                       the bill viewer works on them unchanged. Until now the
                       image was collected and then never shown to anyone. */}
-                  {/* Money received deserves a receipt whether or not it
-                      settled a bill — an advance creates no bill at all, so
-                      without this there was nothing to hand the customer. */}
-                  <DocumentActions
-                    compact
-                    label={`payment-${payment.id}-${customer?.name ?? ''}`}
-                    buildHtml={() =>
-                      buildPaymentReceiptHtml({ payment, customer, owner })
-                    }
-                    buildReceipt={(paperWidth) =>
-                      buildPaymentReceipt({ payment, customer, owner, paperWidth })
-                    }
-                    printToThermal={paymentDocs.printToThermal}
-                    print={paymentDocs.print}
-                    shareAsPdf={paymentDocs.shareAsPdf}
-                    busy={paymentDocs.busy}
-                    busyKey={paymentDocs.busyKey}
-                    documentKey={payment.id}
-                    disabled={!profileLoaded}
-                    style={styles.paymentActions}
-                  />
-
                   {!!payment.transaction_screenshot_url && (
                     <Pressable
                       onPress={() => handleViewTransaction(payment)}
@@ -254,6 +233,29 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                 <Text style={styles.paymentAmount}>
                   {formatCurrency(payment.amount)}
                 </Text>
+                </View>
+
+                {/* Full width beneath the row, not inside the text column:
+                    sharing that column with the amount squeezed the buttons
+                    until "Save as PDF" wrapped onto two lines. */}
+                <DocumentActions
+                  compact
+                  label={`payment-${payment.id}-${customer?.name ?? ''}`}
+                  buildHtml={() =>
+                    buildPaymentReceiptHtml({ payment, customer, owner })
+                  }
+                  buildReceipt={(paperWidth) =>
+                    buildPaymentReceipt({ payment, customer, owner, paperWidth })
+                  }
+                  printToThermal={paymentDocs.printToThermal}
+                  print={paymentDocs.print}
+                  shareAsPdf={paymentDocs.shareAsPdf}
+                  busy={paymentDocs.busy}
+                  busyKey={paymentDocs.busyKey}
+                  documentKey={payment.id}
+                  disabled={!profileLoaded}
+                  style={styles.paymentActions}
+                />
               </View>
             ))}
           </Card>
@@ -427,6 +429,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: SPACING.sm,
+  },
+  paymentEntry: {
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
   paymentRow: {
     flexDirection: 'row',
