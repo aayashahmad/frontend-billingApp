@@ -235,3 +235,26 @@ describe('netBalance', () => {
     expect(netBalance({ total_unpaid: -50, advance_balance: 100 })).toBe(100);
   });
 });
+
+describe('settleWithAdvance — pay later', () => {
+  it('puts the bill on the account after credit covers what it can', () => {
+    // The case that showed nothing on screen: a large bill, a small credit.
+    const result = settleWithAdvance({
+      billTotal: 77600,
+      amountPaid: 0,
+      advanceBalance: 650,
+    });
+    expect(result.advanceApplied).toBe(650);
+    expect(result.balanceDue).toBe(76950);
+  });
+
+  it('leaves nothing owing when credit covers the whole bill', () => {
+    const result = settleWithAdvance({
+      billTotal: 500,
+      amountPaid: 0,
+      advanceBalance: 500,
+    });
+    expect(result.balanceDue).toBe(0);
+    expect(result.advanceRemaining).toBe(0);
+  });
+});

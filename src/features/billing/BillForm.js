@@ -37,6 +37,7 @@ import {
   calculateUnbalance,
   hasPaymentReference,
   settleWithAdvance,
+  isCreditPayment,
   usesEnteredAmount,
 } from '../../utils/billing';
 import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
@@ -335,20 +336,28 @@ const BillFormFields = ({
    * bill will take. Mirrors the server: the advance settles the bill before
    * the customer is asked for anything.
    */
+  const isCredit = isCreditPayment(values.paymentType);
+
   const { advanceApplied, balanceDue } = useMemo(
     () =>
       settleWithAdvance({
         billTotal,
-        amountPaid: entersAmount ? values.amountPaid : billTotal,
+        // Cash and cheque record a typed figure; an online transfer settles
+        // in full; "pay later" receives nothing at all, so the bill lands on
+        // the account minus whatever credit covers it.
+        amountPaid: entersAmount ? values.amountPaid : isCredit ? 0 : billTotal,
         advanceBalance: customer?.advance_balance,
       }),
-    [billTotal, entersAmount, values.amountPaid, customer?.advance_balance],
+    [billTotal, entersAmount, isCredit, values.amountPaid, customer?.advance_balance],
   );
 
   // Counting the advance keeps "Balance due" equal to what the customer is
   // actually asked for; without it the figure overstates the debt by whatever
   // they already paid ahead.
-  const unbalance = entersAmount ? balanceDue : 0;
+  // An online transfer settles the bill by definition; everything else can
+  // leave something owing — including "pay later", which is the whole point
+  // of it and must not be hidden.
+  const unbalance = entersAmount || isCredit ? balanceDue : 0;
   const advanceAvailable = Math.max(toNumber(customer?.advance_balance), 0);
 
   // Money handed over beyond this bill and every old due becomes credit. Shown
@@ -665,9 +674,11 @@ const BillFormFields = ({
             </Text>
           </View>
         )}
-        {entersAmount && (
+        {(entersAmount || isCredit) && (
           <View style={[styles.totalRow, styles.totalRowSpaced]}>
-            <Text style={styles.totalLabel}>Balance due</Text>
+            <Text style={styles.totalLabel}>
+              {isCredit ? 'Goes on account' : 'Balance due'}
+            </Text>
             <Text
               style={[
                 styles.totalValue,
