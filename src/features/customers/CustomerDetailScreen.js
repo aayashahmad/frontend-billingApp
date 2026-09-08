@@ -69,6 +69,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   // Two separate selections: opening the payment image from inside the detail
   // sheet must not close the sheet underneath it.
   const [payingCustomer, setPayingCustomer] = useState(null);
+  const [takingAdvance, setTakingAdvance] = useState(false);
   const [detailBill, setDetailBill] = useState(null);
   const [selectedBill, setSelectedBill] = useState(null);
 
@@ -104,10 +105,13 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     return outstandingAfterPayments(totalUnpaid, payments);
   }, [customer?.total_unpaid, payments, totalUnpaid]);
 
+  const advance = Math.max(roundMoney(toNumber(customer?.advance_balance)), 0);
+
   const handleOpenBill = useCallback((bill) => setDetailBill(bill), []);
 
   const handleRecorded = useCallback(() => {
     setPayingCustomer(null);
+    setTakingAdvance(false);
     // The balance moved server-side, so re-read rather than patch locally.
     refresh();
   }, [refresh]);
@@ -235,6 +239,24 @@ const CustomerDetailScreen = ({ route, navigation }) => {
           </Pressable>
         )}
 
+        {/* Always available: a customer can pay ahead whether or not they
+            currently owe anything, which is the point of an advance. */}
+        <Pressable
+          onPress={() => setTakingAdvance(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Take an advance from ${customer.name}`}
+          style={({ pressed }) => [
+            styles.advanceButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons name="wallet-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.advanceText}>
+            Pay advance
+            {advance > 0 ? ` · ${formatCurrency(advance)} held` : ''}
+          </Text>
+        </Pressable>
+
         <DocumentActions
           label={`statement-${customer.name}-${customer.phone}`}
           buildHtml={buildStatementHtml}
@@ -335,6 +357,15 @@ const CustomerDetailScreen = ({ route, navigation }) => {
         onRecorded={handleRecorded}
       />
 
+      {takingAdvance && (
+        <RecordPaymentModal
+          customer={customer}
+          mode="advance"
+          onClose={() => setTakingAdvance(false)}
+          onRecorded={handleRecorded}
+        />
+      )}
+
       <BillDetailModal
         bill={detailBill}
         onClose={handleCloseBill}
@@ -392,6 +423,23 @@ const styles = StyleSheet.create({
     color: COLORS.success,
   },
   pressed: { opacity: 0.75 },
+  advanceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.card,
+  },
+  advanceText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    marginLeft: SPACING.sm,
+  },
   payButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -50,7 +50,8 @@ describe('billValidationSchema — shared fields', () => {
         'phone',
         'customerName',
         'items[0].itemName',
-        'items[0].qty',
+        // Quantity is absent: it starts at 1, which is what a shopkeeper
+        // ringing up a single item would have typed anyway.
         'items[0].rate',
         'amountPaid',
       ]),
@@ -153,10 +154,13 @@ describe('billValidationSchema — cash bills', () => {
     expect(paths).toContain('amountPaid');
   });
 
-  it('rejects a payment larger than the bill total', async () => {
-    // qty 10 × rate 400 = 4000, summed across the item list
-    const paths = await errorPaths({ ...validCashBill, amountPaid: '4001' });
-    expect(paths).toContain('amountPaid');
+  it('accepts a payment larger than the bill, which becomes advance', async () => {
+    // qty 10 × rate 400 = 4000, summed across the item list. Handing over
+    // more than the bill is ordinary — the surplus settles old dues and then
+    // becomes credit, and the server decides where it lands.
+    await expect(
+      errorPaths({ ...validCashBill, amountPaid: '4001' }),
+    ).resolves.toEqual([]);
   });
 
   it('accepts a payment exactly equal to the bill total', async () => {
@@ -177,12 +181,36 @@ describe('billValidationSchema — cash bills', () => {
     ).resolves.toEqual([]);
   });
 
-  it('still rejects a payment beyond the bill plus everything outstanding', async () => {
+  it('accepts more than the bill and every due — the rest is advance', async () => {
+    await expect(
+      errorPaths({
+        ...validCashBill,
+        items: [{ itemName: 'It1', qty: '1', rate: '100' }],
+        outstandingBalance: 900,
+        amountPaid: '1001',
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it('does not demand an amount when the advance covers the bill', async () => {
+    // Typing 0 to say "their own credit paid for it" is friction for the
+    // commonest use of an advance.
+    await expect(
+      errorPaths({
+        ...validCashBill,
+        items: [{ itemName: 'It1', qty: '1', rate: '100' }],
+        advanceBalance: 500,
+        amountPaid: '',
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it('still demands an amount when the advance falls short', async () => {
     const paths = await errorPaths({
       ...validCashBill,
-      items: [{ itemName: 'It1', qty: '1', rate: '100' }],
-      outstandingBalance: 900,
-      amountPaid: '1001',
+      items: [{ itemName: 'It1', qty: '1', rate: '500' }],
+      advanceBalance: 100,
+      amountPaid: '',
     });
     expect(paths).toContain('amountPaid');
   });
@@ -290,8 +318,11 @@ describe('cheque payments', () => {
     await expect(paths({ ...chequeBill, amountPaid: '600' })).resolves.toEqual([]);
   });
 
-  it('rejects a cheque amount above the bill total', async () => {
-    const result = await paths({ ...chequeBill, amountPaid: '1500' });
-    expect(result).toContain('amountPaid');
+  it('accepts a cheque above the bill total — the rest is advance', async () => {
+    // Cheques are written for round figures all the time; the surplus is
+    // credit, not an error.
+    await expect(
+      paths({ ...chequeBill, amountPaid: '1500' }),
+    ).resolves.toEqual([]);
   });
 });

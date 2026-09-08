@@ -4,12 +4,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Card from '../../components/Card';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
+import { netBalance } from '../../utils/billing';
 import { formatCurrency, toNumber } from '../../utils/money';
 
 const CustomerCard = ({ customer, onPress, onPay }) => {
   const handlePress = useCallback(() => onPress?.(customer), [customer, onPress]);
   const handlePay = useCallback(() => onPay?.(customer), [customer, onPay]);
   const unpaid = toNumber(customer.total_unpaid);
+  // One signed figure: negative is owed to the shop, positive is credit the
+  // shop is holding. A customer is never both, so two numbers would only
+  // make the reader compare them.
+  const balance = netBalance(customer);
   // Nothing owed, nothing to collect — the button would only ever error.
   const canPay = Boolean(onPay) && unpaid > 0;
 
@@ -32,8 +37,12 @@ const CustomerCard = ({ customer, onPress, onPay }) => {
           <Text style={styles.total}>
             {formatCurrency(customer.total_amount)}
           </Text>
-          <Text style={[styles.unpaid, unpaid > 0 ? styles.due : styles.settled]}>
-            {unpaid > 0 ? `Due ${formatCurrency(unpaid)}` : 'Settled'}
+          <Text style={[styles.unpaid, balance < 0 ? styles.due : styles.settled]}>
+            {balance < 0
+              ? `−${formatCurrency(Math.abs(balance))}`
+              : balance > 0
+                ? `+${formatCurrency(balance)} advance`
+                : 'Settled'}
           </Text>
         </View>
 

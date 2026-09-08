@@ -86,6 +86,17 @@ export const buildBillReceipt = ({
     b.row('Ref', bill.transaction_number);
   }
 
+  // The settlement, from what the bill recorded. Money received and the bill
+  // value stay separate lines: ₹1,200 handed over against a ₹1,000 bill must
+  // never print as a ₹1,200 bill.
+  const advanceApplied = toNumber(bill?.advance_applied);
+  const advanceAdded = toNumber(bill?.advance_added);
+  const advanceAfter = toNumber(bill?.advance_balance_after);
+
+  if (advanceApplied > 0) b.row('Advance used', printAmount(advanceApplied));
+  if (advanceAdded > 0) b.row('Excess to adv', printAmount(advanceAdded));
+  if (advanceAfter > 0) b.row('Advance bal', printAmount(advanceAfter));
+
   // How to settle what is left. Skipped entirely on a paid-up bill: paper is
   // the one resource a thermal receipt cannot get back.
   const upiUri =

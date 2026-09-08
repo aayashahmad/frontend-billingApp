@@ -69,7 +69,16 @@ const buildSchema = (outstanding) =>
  * No item fields: this settles what is already owed rather than recording a
  * sale, so it must not touch the customer's billed total.
  */
-const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
+/**
+ * Takes money from a customer.
+ *
+ * Two modes, because the two are different acts: settling a debt, and paying
+ * ahead against future bills. The arithmetic is the same either way — what
+ * clears the debt clears it and the rest becomes credit — but the wording and
+ * the shortcut button differ, and a shopkeeper should not have to work out
+ * which one they are doing from an ambiguous form.
+ */
+const RecordPaymentModal = ({ customer, onClose, onRecorded, mode = 'settle' }) => {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const { submitPayment, submitting, error, clearError } = useRecordPayment();
@@ -77,6 +86,8 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
   if (!customer) return null;
 
   const outstanding = roundMoney(Math.max(toNumber(customer.total_unpaid), 0));
+  const advance = roundMoney(Math.max(toNumber(customer.advance_balance), 0));
+  const takingAdvance = mode === 'advance';
 
   const handleSubmit = async (values) => {
     const payment = await submitPayment(customer, values);
@@ -136,7 +147,9 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
 
               return (
                 <ScrollView keyboardShouldPersistTaps="handled">
-                  <Text style={styles.title}>Take payment</Text>
+                  <Text style={styles.title}>
+                    {takingAdvance ? 'Pay advance' : 'Take payment'}
+                  </Text>
 
                   {/* Who is paying and how much they owe — the only customer
                       context this screen needs. */}
@@ -152,10 +165,16 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
                         {formatCurrency(outstanding)}
                       </Text>
                     </View>
+                    <View style={styles.balanceRow}>
+                      <Text style={styles.balanceLabel}>Advance balance</Text>
+                      <Text style={[styles.balanceValue, styles.advanceValue]}>
+                        {formatCurrency(advance)}
+                      </Text>
+                    </View>
                   </Card>
 
                   <Input
-                    label="Amount received"
+                    label={takingAdvance ? 'Advance amount' : 'Amount received'}
                     placeholder="0.00"
                     value={String(values.amount)}
                     onChangeText={(text) =>
@@ -165,20 +184,30 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
                     keyboardType="decimal-pad"
                     error={fieldError('amount')}
                     hint={
-                      toNumber(values.amount) > outstanding
-                        ? `Clears the balance and keeps ${formatCurrency(
-                            toNumber(values.amount) - outstanding,
-                          )} as advance.`
-                        : `Leaves ${formatCurrency(remaining)} outstanding.`
+                      takingAdvance
+                        ? `New advance balance ${formatCurrency(
+                            advance + Math.max(toNumber(values.amount) - outstanding, 0),
+                          )}, applied to their next bill.`
+                        : toNumber(values.amount) > outstanding
+                          ? `Clears the balance and keeps ${formatCurrency(
+                              toNumber(values.amount) - outstanding,
+                            )} as advance.`
+                          : `Leaves ${formatCurrency(remaining)} outstanding.`
                     }
                     editable={!submitting}
                   />
 
                   <View style={styles.quickRow}>
                     <Button
-                      title={`Pay all ${formatCurrency(outstanding)}`}
+                      title={
+                        takingAdvance
+                          ? 'Clear amount'
+                          : `Pay all ${formatCurrency(outstanding)}`
+                      }
                       variant="secondary"
-                      onPress={() => change('amount', String(outstanding))}
+                      onPress={() =>
+                        change('amount', takingAdvance ? '' : String(outstanding))
+                      }
                       disabled={submitting}
                       style={styles.quickButton}
                     />
@@ -228,7 +257,7 @@ const RecordPaymentModal = ({ customer, onClose, onRecorded }) => {
                   {!!error && <Text style={styles.error}>{error}</Text>}
 
                   <Button
-                    title="Record payment"
+                    title={takingAdvance ? 'Save advance' : 'Record payment'}
                     onPress={submit}
                     loading={submitting}
                     disabled={submitting}
@@ -273,6 +302,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
     marginBottom: SPACING.sm,
   },
+  advanceValue: { color: COLORS.success },
   title: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',

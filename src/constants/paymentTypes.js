@@ -2,18 +2,24 @@ export const PAYMENT_TYPES = Object.freeze({
   CASH: 'cash',
   ONLINE: 'online',
   CHEQUE: 'cheque',
+  // Nothing changed hands: the bill goes on the customer's account.
+  // Recording that as a cash payment of zero would be a lie in the ledger
+  // and in every report that groups by how customers pay.
+  CREDIT: 'credit',
 });
 
 export const PAYMENT_TYPE_OPTIONS = Object.freeze([
   { value: PAYMENT_TYPES.CASH, label: 'Cash' },
   { value: PAYMENT_TYPES.ONLINE, label: 'Online' },
   { value: PAYMENT_TYPES.CHEQUE, label: 'Cheque' },
+  { value: PAYMENT_TYPES.CREDIT, label: 'Pay later' },
 ]);
 
 export const PAYMENT_TYPE_LABELS = Object.freeze({
   [PAYMENT_TYPES.CASH]: 'Cash',
   [PAYMENT_TYPES.ONLINE]: 'Online',
   [PAYMENT_TYPES.CHEQUE]: 'Cheque',
+  [PAYMENT_TYPES.CREDIT]: 'On account',
 });
 
 /**

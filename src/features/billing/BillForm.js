@@ -280,6 +280,7 @@ const BillFormFields = ({
       // What this customer already owes raises the ceiling on what they may
       // hand over: settling old dues alongside a new purchase is one payment.
       setFieldValue('outstandingBalance', found ? found.total_unpaid : 0);
+      setFieldValue('advanceBalance', found ? found.advance_balance ?? 0 : 0);
 
       if (!found) return;
       if (!nameEditedRef.current) setFieldValue('customerName', found.name);
@@ -348,6 +349,18 @@ const BillFormFields = ({
   // actually asked for; without it the figure overstates the debt by whatever
   // they already paid ahead.
   const unbalance = entersAmount ? balanceDue : 0;
+  const advanceAvailable = Math.max(toNumber(customer?.advance_balance), 0);
+
+  // Money handed over beyond this bill and every old due becomes credit. Shown
+  // while typing so the shopkeeper sees where the extra is going before the
+  // bill is written, not after.
+  const excessToAdvance = useMemo(() => {
+    if (!entersAmount) return 0;
+    const surplus = roundMoney(
+      toNumber(values.amountPaid) + advanceApplied - billTotal,
+    );
+    return Math.max(roundMoney(surplus - outstanding), 0);
+  }, [entersAmount, values.amountPaid, advanceApplied, billTotal, outstanding]);
 
   const outstanding = Math.max(toNumber(values.outstandingBalance), 0);
 
@@ -389,6 +402,7 @@ const BillFormFields = ({
       setNameQuery('');
       setFieldValue('phone', digitsOnly);
       setFieldValue('outstandingBalance', 0);
+      setFieldValue('advanceBalance', 0);
       if (digitsOnly.length === 0) resetLookup();
     },
     [resetLookup, setFieldValue],
@@ -425,6 +439,7 @@ const BillFormFields = ({
       // Their dues raise the ceiling on what may be paid against this bill,
       // exactly as the phone lookup does.
       setFieldValue('outstandingBalance', picked.total_unpaid ?? 0);
+      setFieldValue('advanceBalance', picked.advance_balance ?? 0);
       Keyboard.dismiss();
     },
     [setFieldValue],
@@ -626,11 +641,27 @@ const BillFormFields = ({
           <Text style={styles.totalLabel}>Bill total</Text>
           <Text style={styles.totalValue}>{formatCurrency(billTotal)}</Text>
         </View>
+        {advanceAvailable > 0 && (
+          <View style={[styles.totalRow, styles.totalRowSpaced]}>
+            <Text style={styles.totalLabel}>Existing advance</Text>
+            <Text style={styles.totalValue}>
+              {formatCurrency(advanceAvailable)}
+            </Text>
+          </View>
+        )}
         {advanceApplied > 0 && (
           <View style={[styles.totalRow, styles.totalRowSpaced]}>
             <Text style={styles.totalLabel}>Advance applied</Text>
             <Text style={[styles.totalValue, styles.settled]}>
               −{formatCurrency(advanceApplied)}
+            </Text>
+          </View>
+        )}
+        {excessToAdvance > 0 && (
+          <View style={[styles.totalRow, styles.totalRowSpaced]}>
+            <Text style={styles.totalLabel}>Extra to advance</Text>
+            <Text style={[styles.totalValue, styles.settled]}>
+              {formatCurrency(excessToAdvance)}
             </Text>
           </View>
         )}

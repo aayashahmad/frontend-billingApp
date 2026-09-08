@@ -1,4 +1,5 @@
 import {
+  netBalance,
   settleWithAdvance,
   aggregateBillTotals,
   billItems,
@@ -212,5 +213,25 @@ describe('settleWithAdvance', () => {
     });
     expect(result.balanceDue).toBe(400);
     expect(Number.isNaN(result.advanceApplied)).toBe(false);
+  });
+});
+
+describe('netBalance', () => {
+  it('is negative when the customer owes the shop', () => {
+    expect(netBalance({ total_unpaid: 1000, advance_balance: 0 })).toBe(-1000);
+  });
+
+  it('is positive when the shop holds their money', () => {
+    expect(netBalance({ total_unpaid: 0, advance_balance: 300 })).toBe(300);
+  });
+
+  it('is zero for a settled customer', () => {
+    expect(netBalance({ total_unpaid: 0, advance_balance: 0 })).toBe(0);
+    expect(netBalance({})).toBe(0);
+    expect(netBalance(null)).toBe(0);
+  });
+
+  it('ignores negative stored values rather than compounding them', () => {
+    expect(netBalance({ total_unpaid: -50, advance_balance: 100 })).toBe(100);
   });
 });

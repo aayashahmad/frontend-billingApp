@@ -66,42 +66,33 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
     amountPaid: Yup.number()
       .transform(emptyStringToUndefined)
       .when('paymentType', {
-        // Cash and cheque both record an entered figure; online settles in full.
+        // Cash and cheque both record an entered figure; online settles in
+        // full and "pay later" receives nothing at all.
         is: (paymentType) => usesEnteredAmount(paymentType),
         then: (schema) =>
           schema
             .typeError('Amount paid must be a number')
-            .required('Amount paid is required')
             .min(0, 'Amount paid cannot be negative')
             .test(
-              'within-payable',
-              // A customer settling old dues alongside a new purchase hands
-              // over one amount covering both, so the ceiling is this bill
-              // plus whatever they already owe — not the bill alone.
-              'payable',
-              function validateAgainstTotal(value) {
-                if (allowOverpayment || value === undefined) return true;
+              'required-unless-covered-by-advance',
+              'Amount paid is required',
+              function requireUnlessCovered(value) {
+                if (value !== undefined) return true;
 
+                // Nothing to hand over when the customer's own credit already
+                // covers the bill — asking them to type 0 is friction for the
+                // commonest use of an advance.
                 const billTotal = calculateItemsTotal(this.parent.items);
-                // Skip until the lines are themselves valid — their own rules
-                // will surface the error rather than this one.
-                if (billTotal <= 0) return true;
-
-                const outstanding = Math.max(
-                  toNumber(this.parent.outstandingBalance),
+                const advance = Math.max(
+                  toNumber(this.parent.advanceBalance),
                   0,
                 );
-                const payable = roundMoney(billTotal + outstanding);
-                if (value <= payable) return true;
-
-                return this.createError({
-                  message:
-                    outstanding > 0
-                      ? `Amount paid cannot exceed ${formatCurrency(payable)} — this bill plus ${formatCurrency(outstanding)} already outstanding.`
-                      : `Amount paid cannot exceed the bill total of ${formatCurrency(billTotal)}.`,
-                });
+                return advance >= billTotal && billTotal > 0;
               },
             ),
+        // No ceiling: handing over more than the bill is ordinary, and the
+        // surplus settles old dues and then becomes credit. The server is
+        // the authority on where it lands.
         otherwise: (schema) => schema.notRequired(),
       }),
 
@@ -135,9 +126,15 @@ export const createBillValidationSchema = ({ allowOverpayment = false } = {}) =>
 export const billValidationSchema = createBillValidationSchema();
 
 /** A blank line item — also what the "Add item" button appends. */
+/**
+ * A fresh line.
+ *
+ * Quantity starts at 1: a shopkeeper ringing up a single item should not have
+ * to type the most common answer, and an empty box invites a bill of zero.
+ */
 export const createEmptyItem = () => ({
   itemName: '',
-  qty: '',
+  qty: '1',
   rate: '',
   // Set when the line was scanned. `isNewProduct` marks a barcode the
   // catalogue did not know, which is what the form saves after the sale.
@@ -153,6 +150,10 @@ export const INITIAL_BILL_VALUES = Object.freeze({
   // Filled in from the customer lookup. Not sent to the API — it only raises
   // the ceiling on what the customer is allowed to hand over.
   outstandingBalance: 0,
+  // Credit the customer already holds, filled in from the lookup. Not sent
+  // to the API — the server reads it from the customer record — but it
+  // decides whether an amount has to be entered at all.
+  advanceBalance: 0,
   amountPaid: '',
   transactionNumber: '',
   transactionScreenshot: null,

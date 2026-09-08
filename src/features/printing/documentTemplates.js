@@ -13,7 +13,12 @@ import {
   summariseBill,
 } from '../../utils/billing';
 import { formatDateTime } from '../../utils/date';
-import { formatCompactCurrency, formatCurrency } from '../../utils/money';
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  roundMoney,
+  toNumber,
+} from '../../utils/money';
 import { buildUpiUri, formatWhatsAppNumber } from '../../utils/upi';
 import { qrSvg } from './qr';
 
@@ -305,20 +310,77 @@ const paymentDetailsBlock = (owner, { amountDue, reference } = {}) => {
   `;
 };
 
+/** Online transfers and cheques both carry a reference; the label differs. */
+const referenceRowFor = (bill) => {
+  if (!hasPaymentReference(bill?.payment_type)) return '';
+  const label =
+    PAYMENT_REFERENCE_LABELS[bill?.payment_type]?.numberShort ?? 'Reference';
+  return `
+      <tr>
+        <td class="label">${escapeHtml(label)}</td>
+        <td class="num">${escapeHtml(bill?.transaction_number || '—')}</td>
+      </tr>`;
+};
+
+/**
+ * What the bill was worth, and what settled it.
+ *
+ * Every figure is read from the bill rather than recomputed, so a receipt
+ * reprinted next month shows what happened when it was written. The bill
+ * value and the money received are kept visibly separate: handing over
+ * ₹1,200 against a ₹1,000 bill must never print as a ₹1,200 bill.
+ */
+const settlementRows = (bill, { billTotal, amountPaid, unbalance }) => {
+  const advanceApplied = toNumber(bill?.advance_applied);
+  const advanceAdded = toNumber(bill?.advance_added);
+  const advanceAfter = toNumber(bill?.advance_balance_after);
+  // What the money handed over actually settled on this bill, as opposed to
+  // what went to old dues or stayed as credit.
+  const appliedFromPayment = Math.max(
+    roundMoney(billTotal - advanceApplied - unbalance),
+    0,
+  );
+
+  const row = (label, value, className = '') => `
+      <tr>
+        <td class="label">${escapeHtml(label)}</td>
+        <td class="num ${className}">${formatCurrency(value)}</td>
+      </tr>`;
+
+  return `
+    <table class="totals">
+      ${row('Bill amount', billTotal)}
+      <tr>
+        <td class="label">Payment</td>
+        <td class="num">${paymentBadge(bill?.payment_type)}</td>
+      </tr>
+      ${referenceRowFor(bill)}
+      ${amountPaid > 0 ? row('Payment received', amountPaid) : ''}
+      ${advanceApplied > 0 ? row('Advance applied', advanceApplied, 'settled') : ''}
+      ${
+        amountPaid > 0 && (advanceApplied > 0 || advanceAdded > 0)
+          ? row('Applied to this bill', appliedFromPayment)
+          : ''
+      }
+      ${advanceAdded > 0 ? row('Excess to advance', advanceAdded, 'settled') : ''}
+      <tr class="grand">
+        <td>Outstanding on this bill</td>
+        <td class="num ${unbalance > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(unbalance)}
+        </td>
+      </tr>
+      ${
+        advanceAfter > 0
+          ? row('Customer advance balance', advanceAfter, 'settled')
+          : ''
+      }
+    </table>
+  `;
+};
+
 export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
   const { billTotal, amountPaid, unbalance } = summariseBill(bill);
   const issuedAt = formatDateTime(bill?.created_at);
-
-  // Online transfers and cheques both carry a reference; the label differs.
-  const referenceLabel =
-    PAYMENT_REFERENCE_LABELS[bill?.payment_type]?.numberShort;
-  const referenceRow = hasPaymentReference(bill?.payment_type)
-    ? `
-        <tr>
-          <td class="label">${escapeHtml(referenceLabel ?? 'Reference')}</td>
-          <td class="num">${escapeHtml(bill.transaction_number || '—')}</td>
-        </tr>`
-    : '';
 
   const body = `
     ${shopHeader(owner, 'Receipt', issuedAt)}
@@ -357,23 +419,7 @@ export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
       </tfoot>
     </table>
 
-    <table class="totals">
-      <tr>
-        <td class="label">Payment</td>
-        <td class="num">${paymentBadge(bill?.payment_type)}</td>
-      </tr>
-      ${referenceRow}
-      <tr>
-        <td class="label">Amount paid</td>
-        <td class="num">${formatCurrency(amountPaid)}</td>
-      </tr>
-      <tr class="grand">
-        <td>Balance due</td>
-        <td class="num ${unbalance > 0 ? 'due' : 'settled'}">
-          ${formatCurrency(unbalance)}
-        </td>
-      </tr>
-    </table>
+    ${settlementRows(bill, { billTotal, amountPaid, unbalance })}
 
     ${paymentDetailsBlock(owner, {
       amountDue: unbalance,

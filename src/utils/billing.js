@@ -58,6 +58,10 @@ export const isOnlinePayment = (paymentType) =>
 
 export const isCashPayment = (paymentType) => paymentType === PAYMENT_TYPES.CASH;
 
+/** Nothing received — the whole bill goes on the customer's account. */
+export const isCreditPayment = (paymentType) =>
+  paymentType === PAYMENT_TYPES.CREDIT;
+
 export const isChequePayment = (paymentType) =>
   paymentType === PAYMENT_TYPES.CHEQUE;
 
@@ -153,3 +157,16 @@ export const settleWithAdvance = ({
     advanceRemaining: roundMoney(available - advanceApplied),
   };
 };
+
+/**
+ * One figure describing where a customer stands.
+ *
+ * Negative means they owe the shop, positive means the shop is holding their
+ * money. A customer is never both at once, so a single signed number states
+ * the relationship without the reader having to compare two.
+ */
+export const netBalance = (customer) =>
+  roundMoney(
+    Math.max(toNumber(customer?.advance_balance), 0) -
+      Math.max(toNumber(customer?.total_unpaid), 0),
+  );

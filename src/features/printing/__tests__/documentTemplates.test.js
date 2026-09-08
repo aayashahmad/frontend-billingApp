@@ -418,3 +418,70 @@ describe('statement payment details', () => {
     expect(html).not.toContain('How to pay');
   });
 });
+
+describe('settlement on the printed bill', () => {
+  const owner = { business_name: 'Ledger Store' };
+  const customer = { name: 'Ravi Kumar', phone: '9811100003' };
+
+  const bill = (overrides) => ({
+    id: 7,
+    payment_type: 'cash',
+    bill_total: 1000,
+    created_at: '2026-09-08T10:00:00',
+    items: [{ item_name: 'Rice', qty: 1, rate: 1000, line_total: 1000 }],
+    advance_applied: 0,
+    advance_added: 0,
+    advance_balance_after: 0,
+    amount_paid: 1000,
+    unbalance: 0,
+    ...overrides,
+  });
+
+  it('never presents money received as the bill value', () => {
+    // ₹1,200 handed over against a ₹1,000 bill.
+    const html = buildBillReceiptHtml({
+      bill: bill({ amount_paid: 1200, advance_added: 200, advance_balance_after: 200 }),
+      customer,
+      owner,
+    });
+    expect(html).toContain('Bill amount');
+    expect(html).toContain('₹1,000.00');
+    expect(html).toContain('Payment received');
+    expect(html).toContain('₹1,200.00');
+    // The excess is called out, not folded into the bill.
+    expect(html).toContain('Excess to advance');
+    expect(html).toContain('Customer advance balance');
+  });
+
+  it('shows credit drawn down and what was still collected', () => {
+    // ₹1,000 bill: ₹300 credit, ₹700 cash.
+    const html = buildBillReceiptHtml({
+      bill: bill({ amount_paid: 700, advance_applied: 300 }),
+      customer,
+      owner,
+    });
+    expect(html).toContain('Advance applied');
+    expect(html).toContain('₹300.00');
+    expect(html).toContain('Applied to this bill');
+    expect(html).toContain('₹700.00');
+  });
+
+  it('states what is still owed on an unpaid bill', () => {
+    const html = buildBillReceiptHtml({
+      bill: bill({ payment_type: 'credit', amount_paid: 0, unbalance: 1000 }),
+      customer,
+      owner,
+    });
+    expect(html).toContain('Outstanding on this bill');
+    expect(html).toContain('₹1,000.00');
+    // Nothing was received, so no payment line is invented.
+    expect(html).not.toContain('Payment received');
+  });
+
+  it('leaves the extra lines off an ordinary settled bill', () => {
+    const html = buildBillReceiptHtml({ bill: bill(), customer, owner });
+    expect(html).not.toContain('Advance applied');
+    expect(html).not.toContain('Excess to advance');
+    expect(html).not.toContain('Customer advance balance');
+  });
+});
