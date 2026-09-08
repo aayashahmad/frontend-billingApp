@@ -164,3 +164,64 @@ export const buildTestReceipt = ({ owner, paperWidth = DEFAULT_PAPER_WIDTH }) =>
 };
 
 export default buildBillReceipt;
+
+/**
+ * A payment or advance as a thermal receipt.
+ *
+ * Mirrors the printed version's information: what was received, what it
+ * settled, what became credit, and where the account stands now.
+ */
+export const buildPaymentReceipt = ({
+  payment,
+  customer,
+  owner,
+  paperWidth = DEFAULT_PAPER_WIDTH,
+}) => {
+  const b = new EscPosBuilder(paperWidth);
+  const head = buildLetterhead(owner);
+
+  const amount = toNumber(payment?.amount);
+  const appliedToDues = toNumber(payment?.applied_to_dues);
+  const advanceAdded = toNumber(payment?.advance_added);
+  const outstandingAfter = toNumber(payment?.outstanding_after);
+  const advanceAfter = toNumber(payment?.advance_balance_after);
+  const isPureAdvance = appliedToDues === 0 && advanceAdded > 0;
+
+  b.init().align('center').bold(true).size({ width: 2, height: 2 });
+  b.wrap(head.name);
+  b.size().bold(false);
+
+  head.addressLines.forEach((line) => b.wrap(line));
+  if (head.phones.length) b.wrap(head.phones.join(' / '));
+  if (head.gstin) b.wrap(`GSTIN: ${head.gstin}`);
+
+  b.feed(1).bold(true);
+  b.line(isPureAdvance ? 'ADVANCE RECEIPT' : 'PAYMENT RECEIPT');
+  b.bold(false).align('left').rule();
+
+  if (payment?.id) b.row('Receipt', `#${payment.id}`);
+  b.row('Date', formatDateTime(payment?.created_at));
+  if (customer?.name) b.wrap(customer.name);
+  if (customer?.phone) b.wrap(customer.phone);
+
+  b.rule();
+  b.row('Received', printAmount(amount));
+  b.row('Method', PAYMENT_LABELS[payment?.payment_type] ?? payment?.payment_type ?? '');
+  if (payment?.transaction_number) b.row('Ref', payment.transaction_number);
+
+  if (appliedToDues > 0) b.row('To dues', printAmount(appliedToDues));
+  if (advanceAdded > 0) b.row('To advance', printAmount(advanceAdded));
+
+  b.rule();
+  b.bold(true).row('Outstanding', printAmount(outstandingAfter)).bold(false);
+  if (advanceAfter > 0) b.row('Advance bal', printAmount(advanceAfter));
+
+  b.feed(1).align('center');
+  if (head.whatsappNumber) {
+    b.wrap(`WhatsApp: ${formatWhatsAppNumber(head.whatsappNumber)}`);
+  }
+  b.wrap(head.footerNote || 'Thank you for your payment.');
+  b.cut();
+
+  return b;
+};

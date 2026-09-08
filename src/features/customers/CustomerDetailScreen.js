@@ -33,8 +33,12 @@ import RecordPaymentModal from './RecordPaymentModal';
 import {
   buildBillReceiptHtml,
   buildCustomerStatementHtml,
+  buildPaymentReceiptHtml,
 } from '../printing/documentTemplates';
-import { buildBillReceipt } from '../printing/thermalReceipt';
+import {
+  buildBillReceipt,
+  buildPaymentReceipt,
+} from '../printing/thermalReceipt';
 
 const keyExtractor = (bill) => String(bill.id);
 
@@ -77,6 +81,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
   // the statement buttons, and vice versa.
   const statementDocs = useDocumentActions();
   const billDocs = useDocumentActions();
+  const paymentDocs = useDocumentActions();
 
   useEffect(() => {
     const title = customer?.name || customerName;
@@ -152,6 +157,10 @@ const CustomerDetailScreen = ({ route, navigation }) => {
             print={billDocs.print}
             shareAsPdf={billDocs.shareAsPdf}
             busy={billDocs.busy}
+            // One hook serves every row, so each says which bill it is;
+            // without this, printing one bill spun all of them.
+            busyKey={billDocs.busyKey}
+            documentKey={item.id}
             disabled={!profileLoaded}
           />
         }
@@ -159,7 +168,9 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     ),
     [
       billDocs.busy,
+      billDocs.busyKey,
       billDocs.print,
+      billDocs.printToThermal,
       billDocs.shareAsPdf,
       customer,
       handleOpenBill,
@@ -200,6 +211,28 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                   {/* Payments carry the same screenshot fields as bills, so
                       the bill viewer works on them unchanged. Until now the
                       image was collected and then never shown to anyone. */}
+                  {/* Money received deserves a receipt whether or not it
+                      settled a bill — an advance creates no bill at all, so
+                      without this there was nothing to hand the customer. */}
+                  <DocumentActions
+                    compact
+                    label={`payment-${payment.id}-${customer?.name ?? ''}`}
+                    buildHtml={() =>
+                      buildPaymentReceiptHtml({ payment, customer, owner })
+                    }
+                    buildReceipt={(paperWidth) =>
+                      buildPaymentReceipt({ payment, customer, owner, paperWidth })
+                    }
+                    printToThermal={paymentDocs.printToThermal}
+                    print={paymentDocs.print}
+                    shareAsPdf={paymentDocs.shareAsPdf}
+                    busy={paymentDocs.busy}
+                    busyKey={paymentDocs.busyKey}
+                    documentKey={payment.id}
+                    disabled={!profileLoaded}
+                    style={styles.paymentActions}
+                  />
+
                   {!!payment.transaction_screenshot_url && (
                     <Pressable
                       onPress={() => handleViewTransaction(payment)}
@@ -401,6 +434,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   paymentText: { flex: 1, paddingRight: SPACING.sm },
+  paymentActions: { marginTop: SPACING.sm },
   paymentProof: { alignSelf: 'flex-start', paddingVertical: SPACING.xs },
   paymentProofText: {
     color: COLORS.primary,

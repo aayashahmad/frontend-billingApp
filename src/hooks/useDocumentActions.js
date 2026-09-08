@@ -12,6 +12,10 @@ import { printBytes } from '../services/thermalPrinterService';
  */
 export const useDocumentActions = () => {
   const [busy, setBusy] = useState(null);
+  // Which document is working, when one hook serves a whole list. Without
+  // it every row shares the single busy flag, so printing one bill spins
+  // the buttons on all of them.
+  const [busyKey, setBusyKey] = useState(null);
   const [error, setError] = useState(null);
   const mountedRef = useRef(true);
 
@@ -24,8 +28,9 @@ export const useDocumentActions = () => {
 
   const clearError = useCallback(() => setError(null), []);
 
-  const run = useCallback(async (action, fn) => {
+  const run = useCallback(async (action, fn, key = null) => {
     setBusy(action);
+    setBusyKey(key);
     setError(null);
     try {
       await fn();
@@ -38,17 +43,20 @@ export const useDocumentActions = () => {
       }
       return false;
     } finally {
-      if (mountedRef.current) setBusy(null);
+      if (mountedRef.current) {
+        setBusy(null);
+        setBusyKey(null);
+      }
     }
   }, []);
 
   const print = useCallback(
-    (html) => run('print', () => printHtml(html)),
+    (html, key) => run('print', () => printHtml(html), key),
     [run],
   );
 
   const shareAsPdf = useCallback(
-    (html, label) => run('pdf', () => sharePdf(html, label)),
+    (html, label, key) => run('pdf', () => sharePdf(html, label), key),
     [run],
   );
 
@@ -60,7 +68,7 @@ export const useDocumentActions = () => {
    * width that printer actually has.
    */
   const printToThermal = useCallback(
-    (buildReceipt) =>
+    (buildReceipt, key) =>
       run('thermal', async () => {
         const printer = await loadPrinter();
         if (!printer) {
@@ -70,11 +78,11 @@ export const useDocumentActions = () => {
         }
         const receipt = buildReceipt(printer.paperWidth);
         await printBytes(printer.address, receipt.toBase64());
-      }),
+      }, key),
     [run],
   );
 
-  return { print, shareAsPdf, printToThermal, busy, error, clearError };
+  return { print, shareAsPdf, printToThermal, busy, busyKey, error, clearError };
 };
 
 export default useDocumentActions;

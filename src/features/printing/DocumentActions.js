@@ -18,13 +18,23 @@ const DocumentActions = ({
   buildReceipt,
   printToThermal,
   busy,
+  // Identifies this document when one hook drives a list of them. Buttons
+  // only show their spinner when the work belongs to them.
+  busyKey,
+  documentKey,
   error,
   compact = false,
   disabled = false,
   style,
 }) => {
+  // Only this document's own work counts as "mine"; a sibling printing
+  // should not light up these buttons.
+  const mine = documentKey === undefined || busyKey === documentKey;
+  const working = Boolean(busy) && mine;
+
   // Blocked while the letterhead is still loading — printing early would
-  // silently produce a document with no business details at the top.
+  // silently produce a document with no business details at the top. Also
+  // blocked while any document prints, since they share one printer.
   const blocked = Boolean(busy) || disabled;
 
   return (
@@ -33,8 +43,8 @@ const DocumentActions = ({
         <Button
           title="Print receipt"
           icon="print-outline"
-          onPress={() => printToThermal(buildReceipt)}
-          loading={busy === 'thermal'}
+          onPress={() => printToThermal(buildReceipt, documentKey)}
+          loading={working && busy === 'thermal'}
           disabled={blocked}
           style={styles.thermal}
         />
@@ -44,8 +54,8 @@ const DocumentActions = ({
         <Button
           title="Print"
           variant="secondary"
-          onPress={() => print(buildHtml())}
-          loading={busy === 'print'}
+          onPress={() => print(buildHtml(), documentKey)}
+          loading={working && busy === 'print'}
           disabled={blocked}
           style={[styles.action, compact && styles.compact]}
         />
@@ -53,8 +63,8 @@ const DocumentActions = ({
         <Button
           title="Save as PDF"
           variant="secondary"
-          onPress={() => shareAsPdf(buildHtml(), label)}
-          loading={busy === 'pdf'}
+          onPress={() => shareAsPdf(buildHtml(), label, documentKey)}
+          loading={working && busy === 'pdf'}
           disabled={blocked}
           style={[styles.action, compact && styles.compact]}
         />

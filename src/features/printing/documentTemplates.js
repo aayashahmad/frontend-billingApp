@@ -719,3 +719,79 @@ export const buildSalesReportHtml = ({ report, owner }) => {
 
   return wrap(`${periodLabel} sales report`, body);
 };
+
+/**
+ * A receipt for money received, bill or no bill.
+ *
+ * An advance creates no bill, so without this there was nothing to hand the
+ * customer for money they had just paid — the one moment they most expect a
+ * piece of paper. Reads the split the server recorded, so a reprint shows
+ * what happened at the time rather than today's balances.
+ */
+export const buildPaymentReceiptHtml = ({ payment, customer, owner }) => {
+  const amount = toNumber(payment?.amount);
+  const appliedToDues = toNumber(payment?.applied_to_dues);
+  const advanceAdded = toNumber(payment?.advance_added);
+  const outstandingAfter = toNumber(payment?.outstanding_after);
+  const advanceAfter = toNumber(payment?.advance_balance_after);
+  const issuedAt = formatDateTime(payment?.created_at);
+
+  const row = (label, value, className = '') => `
+      <tr>
+        <td class="label">${escapeHtml(label)}</td>
+        <td class="num ${className}">${formatCurrency(value)}</td>
+      </tr>`;
+
+  // An advance is a different act from settling a debt, and the heading
+  // should say which one the customer just did.
+  const isPureAdvance = appliedToDues === 0 && advanceAdded > 0;
+  const title = isPureAdvance ? 'Advance receipt' : 'Payment receipt';
+
+  const body = `
+    ${shopHeader(owner, title, issuedAt)}
+    ${partyBlock(customer)}
+
+    <div class="section-title">
+      ${escapeHtml(isPureAdvance ? 'Advance received' : 'Payment received')}
+      ${payment?.id ? ` #${escapeHtml(payment.id)}` : ''}
+    </div>
+
+    <table class="totals">
+      ${row('Amount received', amount)}
+      <tr>
+        <td class="label">Method</td>
+        <td class="num">${paymentBadge(payment?.payment_type)}</td>
+      </tr>
+      ${
+        payment?.transaction_number
+          ? `<tr>
+               <td class="label">Reference</td>
+               <td class="num">${escapeHtml(payment.transaction_number)}</td>
+             </tr>`
+          : ''
+      }
+      ${appliedToDues > 0 ? row('Applied to outstanding', appliedToDues) : ''}
+      ${advanceAdded > 0 ? row('Kept as advance', advanceAdded, 'settled') : ''}
+      <tr class="grand">
+        <td>Outstanding after</td>
+        <td class="num ${outstandingAfter > 0 ? 'due' : 'settled'}">
+          ${formatCurrency(outstandingAfter)}
+        </td>
+      </tr>
+      ${advanceAfter > 0 ? row('Advance balance', advanceAfter, 'settled') : ''}
+    </table>
+
+    ${
+      payment?.note
+        ? `<div class="section-title">Note</div>
+           <p class="party-meta">${escapeHtml(payment.note)}</p>`
+        : ''
+    }
+
+    <div class="footer">
+      ${escapeHtml(buildLetterhead(owner).footerNote || 'Thank you for your payment.')}
+    </div>
+  `;
+
+  return wrap(`${title} ${payment?.id ?? ''}`, body);
+};
