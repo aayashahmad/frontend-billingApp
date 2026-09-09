@@ -113,6 +113,17 @@ const SignupScreen = ({ navigation }) => {
         setNotice(null);
         clearInterval(countdown.current);
       } catch (err) {
+        // Naming the address and the "newest code" rule is the whole fix for
+        // the commonest failure: an inbox holding more than one of these,
+        // where the older code silently no longer works.
+        if (err?.status === 400) {
+          setCode('');
+          setVerifyError(
+            `That code did not match. Use the newest email sent to ${address} — ` +
+              'asking for another code cancels the one before it.',
+          );
+          return;
+        }
         setVerifyError(err?.message || 'That code did not match.');
       } finally {
         setBusy(false);
