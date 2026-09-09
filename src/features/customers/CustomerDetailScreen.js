@@ -146,7 +146,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
         actions={
           <DocumentActions
             compact
-            label={`bill-${item.id}-${customer?.name ?? ''}`}
+            label={`${customer?.name ?? 'customer'}-bill-${item.id}`}
             buildHtml={() =>
               buildBillReceiptHtml({ bill: item, customer, owner })
             }
@@ -240,7 +240,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                     until "Save as PDF" wrapped onto two lines. */}
                 <DocumentActions
                   compact
-                  label={`payment-${payment.id}-${customer?.name ?? ''}`}
+                  label={`${customer?.name ?? 'customer'}-payment-${payment.id}`}
                   buildHtml={() =>
                     buildPaymentReceiptHtml({ payment, customer, owner })
                   }
@@ -293,7 +293,7 @@ const CustomerDetailScreen = ({ route, navigation }) => {
         </Pressable>
 
         <DocumentActions
-          label={`statement-${customer.name}-${customer.phone}`}
+          label={`${customer.name}-statement-${customer.phone}`}
           buildHtml={buildStatementHtml}
           print={statementDocs.print}
           shareAsPdf={statementDocs.shareAsPdf}

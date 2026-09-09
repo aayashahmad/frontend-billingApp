@@ -115,7 +115,7 @@ const NewBillScreen = ({ navigation }) => {
             </Text>
             <DocumentActions
               compact
-              label={`bill-${lastCreated.bill.id}-${lastCreated.customer.name}`}
+              label={`${lastCreated.customer.name}-bill-${lastCreated.bill.id}`}
               buildHtml={() =>
                 buildBillReceiptHtml({
                   bill: lastCreated.bill,

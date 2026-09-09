@@ -11,6 +11,34 @@ export const signup = async ({ username, email, phone, password }) => {
   return data;
 };
 
+/**
+ * Emails a code proving the person signing up owns this address.
+ *
+ * The address on an account is the only way back in after a forgotten
+ * password, so it is proved before the account exists rather than after.
+ */
+export const requestEmailVerification = async (email, { signal } = {}) => {
+  const { data } = await api.post(
+    '/auth/verify-email/request',
+    { email: String(email).trim().toLowerCase() },
+    { signal },
+  );
+  return data?.message ?? '';
+};
+
+/** Confirms the emailed code. The server remembers the address is proved. */
+export const confirmEmailVerification = async (
+  { email, code },
+  { signal } = {},
+) => {
+  const { data } = await api.post(
+    '/auth/verify-email/confirm',
+    { email: String(email).trim().toLowerCase(), code: String(code).trim() },
+    { signal },
+  );
+  return data?.message ?? '';
+};
+
 /** Signed-in owner's profile — resolved from the bearer token server-side. */
 export const getProfile = async ({ signal } = {}) => {
   const { data } = await api.get('/auth/me', { signal });
