@@ -51,9 +51,9 @@ const SignupScreen = ({ navigation }) => {
   // an unmounted component.
   useEffect(() => () => clearInterval(countdown.current), []);
 
-  const startCooldown = useCallback(() => {
+  const startCooldown = useCallback((seconds = RESEND_SECONDS) => {
     clearInterval(countdown.current);
-    setSecondsLeft(RESEND_SECONDS);
+    setSecondsLeft(Math.max(Math.ceil(seconds), 1));
     countdown.current = setInterval(() => {
       setSecondsLeft((left) => {
         if (left <= 1) {
@@ -83,6 +83,16 @@ const SignupScreen = ({ navigation }) => {
         setNotice(message || `We sent a code to ${address}.`);
         startCooldown();
       } catch (err) {
+        // The server refusing a second code inside its cooldown is not a
+        // failure — the first code is already in the inbox. Blocking the
+        // code box here left the owner with a code and nowhere to type it.
+        if (err?.status === 429) {
+          const wait = Number(/(\d+)\s*seconds?/.exec(err.message)?.[1]);
+          setStage('sent');
+          setNotice(`A code is already on its way to ${address}.`);
+          startCooldown(Number.isFinite(wait) ? wait : RESEND_SECONDS);
+          return;
+        }
         setVerifyError(err?.message || 'Could not send the code. Try again.');
       } finally {
         setBusy(false);
@@ -220,6 +230,10 @@ const SignupScreen = ({ navigation }) => {
                 </Text>
               )}
 
+              {stage === 'sent' && !!notice && (
+                <Text style={styles.notice}>{notice}</Text>
+              )}
+
               {stage === 'sent' && (
                 <View style={styles.codeBlock}>
                   <Input
@@ -243,7 +257,9 @@ const SignupScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {!!notice && <Text style={styles.notice}>{notice}</Text>}
+              {stage !== 'sent' && !!notice && (
+                <Text style={styles.notice}>{notice}</Text>
+              )}
               {!!verifyError && <Text style={styles.error}>{verifyError}</Text>}
 
               <Input
