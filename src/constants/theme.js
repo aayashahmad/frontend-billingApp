@@ -1,7 +1,15 @@
 export const COLORS = Object.freeze({
-  primary: '#2563EB',
-  primaryDark: '#1D4ED8',
-  primaryLight: '#DBEAFE',
+  // Indigo rather than a plain blue: deep enough to carry a filled header
+  // without the washed-out look the lighter blue had on cheap LCD panels.
+  primary: '#4338CA',
+  primaryDark: '#3730A3',
+  primaryLight: '#E0E7FF',
+  // Warm counterweight to the indigo, for the one thing on a screen that
+  // wants the eye — a highlighted figure, a badge, the brand mark. Never
+  // used for success or danger, which own their own colours.
+  accent: '#F59E0B',
+  accentDark: '#B45309',
+  accentLight: '#FEF3C7',
   // green-700: the lighter green failed contrast on white wherever it
   // carried money information.
   success: '#15803D',
@@ -9,7 +17,7 @@ export const COLORS = Object.freeze({
   danger: '#DC2626',
   dangerLight: '#FEE2E2',
   warning: '#D97706',
-  background: '#F1F5F9',
+  background: '#F8FAFC',
   card: '#FFFFFF',
   border: '#E2E8F0',
   text: '#0F172A',

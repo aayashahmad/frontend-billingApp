@@ -29,6 +29,9 @@ import {
 import { formatDateTime } from '../../utils/date';
 import { formatCurrency, roundMoney, toNumber } from '../../utils/money';
 import DocumentActions from '../printing/DocumentActions';
+import { buildBalanceMessage } from '../../utils/messaging';
+import { buildCustomerStatementCsv } from '../printing/statementCsv';
+import ContactActions from './ContactActions';
 import RecordPaymentModal from './RecordPaymentModal';
 import {
   buildBillReceiptHtml,
@@ -137,6 +140,19 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     [bills, customer, outstanding, owner, payments],
   );
 
+  const buildStatementCsv = useCallback(
+    () =>
+      buildCustomerStatementCsv({
+        customer,
+        bills,
+        payments,
+        owner,
+        outstanding,
+        issuedAt: formatDateTime(new Date().toISOString()),
+      }),
+    [bills, customer, outstanding, owner, payments],
+  );
+
   const renderItem = useCallback(
     ({ item }) => (
       <BillListItem
@@ -154,7 +170,6 @@ const CustomerDetailScreen = ({ route, navigation }) => {
               buildBillReceipt({ bill: item, customer, owner, paperWidth })
             }
             printToThermal={billDocs.printToThermal}
-            print={billDocs.print}
             shareAsPdf={billDocs.shareAsPdf}
             busy={billDocs.busy}
             // One hook serves every row, so each says which bill it is;
@@ -248,7 +263,6 @@ const CustomerDetailScreen = ({ route, navigation }) => {
                     buildPaymentReceipt({ payment, customer, owner, paperWidth })
                   }
                   printToThermal={paymentDocs.printToThermal}
-                  print={paymentDocs.print}
                   shareAsPdf={paymentDocs.shareAsPdf}
                   busy={paymentDocs.busy}
                   busyKey={paymentDocs.busyKey}
@@ -295,12 +309,23 @@ const CustomerDetailScreen = ({ route, navigation }) => {
         <DocumentActions
           label={`${customer.name}-statement-${customer.phone}`}
           buildHtml={buildStatementHtml}
+          buildCsv={buildStatementCsv}
           print={statementDocs.print}
           shareAsPdf={statementDocs.shareAsPdf}
+          shareAsCsv={statementDocs.shareAsCsv}
           busy={statementDocs.busy}
           error={statementDocs.error}
           disabled={!profileLoaded}
           style={styles.statementActions}
+        />
+        <ContactActions
+          title="Send balance reminder"
+          phone={customer?.phone}
+          message={buildBalanceMessage({
+            customer,
+            shopName: owner?.business_name || owner?.username,
+          })}
+          style={styles.contactActions}
         />
         <CreditLimitCard
           customer={customer}
@@ -420,6 +445,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: SPACING.md },
   header: { marginBottom: SPACING.sm },
+  contactActions: { marginTop: SPACING.lg },
   statementActions: { marginTop: SPACING.md },
   paymentsCard: { marginTop: SPACING.md },
   paymentsTitle: {

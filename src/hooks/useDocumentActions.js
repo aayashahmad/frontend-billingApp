@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { loadPrinter } from '../services/printerSettings';
-import { printHtml, sharePdf } from '../services/printService';
+import { printHtml, sharePdf, shareTextFile } from '../services/printService';
 import { printBytes } from '../services/thermalPrinterService';
 
 /**
  * Wraps print / share-as-PDF with a single busy flag and error state.
  *
- * `busy` names the action in flight ('print' | 'pdf' | null) so each button
- * can show its own spinner without a second piece of state.
+ * `busy` names the action in flight ('print' | 'pdf' | 'csv' | 'thermal' |
+ * null) so each button can show its own spinner without a second piece of
+ * state.
  */
 export const useDocumentActions = () => {
   const [busy, setBusy] = useState(null);
@@ -60,6 +61,12 @@ export const useDocumentActions = () => {
     [run],
   );
 
+  const shareAsCsv = useCallback(
+    (content, label, key) =>
+      run('csv', () => shareTextFile(content, label), key),
+    [run],
+  );
+
   /**
    * Sends a receipt straight to the configured Bluetooth printer.
    *
@@ -82,7 +89,16 @@ export const useDocumentActions = () => {
     [run],
   );
 
-  return { print, shareAsPdf, printToThermal, busy, busyKey, error, clearError };
+  return {
+    print,
+    shareAsPdf,
+    shareAsCsv,
+    printToThermal,
+    busy,
+    busyKey,
+    error,
+    clearError,
+  };
 };
 
 export default useDocumentActions;

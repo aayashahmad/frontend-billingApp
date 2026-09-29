@@ -11,7 +11,9 @@ import { useKeyboardInputScroll } from '../../hooks/useKeyboardInputScroll';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
 import { billItems, calculateBillTotal } from '../../utils/billing';
+import { buildBillMessage } from '../../utils/messaging';
 import { formatCurrency } from '../../utils/money';
+import ContactActions from '../customers/ContactActions';
 import DocumentActions from '../printing/DocumentActions';
 import { buildBillReceiptHtml } from '../printing/documentTemplates';
 import { buildBillReceipt } from '../printing/thermalReceipt';
@@ -132,12 +134,22 @@ const NewBillScreen = ({ navigation }) => {
                 })
               }
               printToThermal={receiptDocs.printToThermal}
-              print={receiptDocs.print}
               shareAsPdf={receiptDocs.shareAsPdf}
               busy={receiptDocs.busy}
               error={receiptDocs.error}
               disabled={!profileLoaded}
               style={styles.receiptDocs}
+            />
+
+            <ContactActions
+              title="Send bill to customer"
+              phone={lastCreated.customer?.phone}
+              message={buildBillMessage({
+                customer: lastCreated.customer,
+                bill: lastCreated.bill,
+                shopName: owner?.business_name || owner?.username,
+              })}
+              style={styles.receiptContact}
             />
 
             <View style={styles.receiptActions}>
@@ -229,6 +241,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
   },
+  receiptContact: { marginTop: SPACING.md },
   receiptDocs: { marginTop: SPACING.md },
   receiptActions: { flexDirection: 'row', marginTop: SPACING.sm },
   receiptAction: { flex: 1 },

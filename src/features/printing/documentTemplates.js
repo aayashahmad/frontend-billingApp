@@ -46,7 +46,7 @@ const BASE_STYLES = `
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom: 2px solid #2563EB;
+    border-bottom: 2px solid #4338CA;
     padding-bottom: 16px;
     margin-bottom: 20px;
   }
@@ -72,7 +72,7 @@ const BASE_STYLES = `
     border-radius: 2px;
     margin: 0 4px 0 12px;
   }
-  .chart-legend .swatch.collected { background: #2563EB; }
+  .chart-legend .swatch.collected { background: #4338CA; }
   .chart-legend .swatch.due { background: #DC2626; }
   .pay-label { color: #64748B; font-size: 11px; padding: 3px 16px 3px 0; }
   .pay-value { font-size: 11px; font-weight: 600; padding: 3px 0; }
@@ -81,7 +81,7 @@ const BASE_STYLES = `
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #2563EB;
+    color: #4338CA;
     font-weight: 700;
   }
   .doc-date { color: #64748B; font-size: 11px; margin-top: 4px; }
@@ -134,8 +134,8 @@ const BASE_STYLES = `
     border-radius: 999px;
     font-size: 10px;
     font-weight: 700;
-    background: #DBEAFE;
-    color: #1D4ED8;
+    background: #E0E7FF;
+    color: #3730A3;
   }
   .badge.cash { background: #DCFCE7; color: #16A34A; }
   .badge.cheque { background: #FEF3C7; color: #B45309; }
@@ -646,7 +646,7 @@ export const buildSalesReportHtml = ({ report, owner }) => {
 
       return `
         <rect x="${x}" y="${top}" width="${barWidth}" height="${dueHeight}" fill="#DC2626" />
-        <rect x="${x}" y="${top + dueHeight}" width="${barWidth}" height="${collectedHeight}" fill="#2563EB" />
+        <rect x="${x}" y="${top + dueHeight}" width="${barWidth}" height="${collectedHeight}" fill="#4338CA" />
         <text x="${x + barWidth / 2}" y="${chartHeight + 14}" font-size="9" fill="#64748B" text-anchor="middle">${escapeHtml(bucket.label)}</text>`;
     })
     .join('');

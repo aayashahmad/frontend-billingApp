@@ -14,6 +14,10 @@ const DocumentActions = ({
   label,
   print,
   shareAsPdf,
+  // Optional: statements also export to a spreadsheet. A single bill has
+  // nothing to reconcile, so it does not get this.
+  buildCsv,
+  shareAsCsv,
   // Optional: only bills can go to a receipt printer, not statements.
   buildReceipt,
   printToThermal,
@@ -51,15 +55,23 @@ const DocumentActions = ({
       )}
 
       <View style={styles.row}>
-        <Button
-          title="Print"
-          variant="secondary"
-          onPress={() => print(buildHtml(), documentKey)}
-          loading={working && busy === 'print'}
-          disabled={blocked}
-          style={[styles.action, compact && styles.compact]}
-        />
-        <View style={styles.gap} />
+        {/* The OS print sheet is only offered where a full-page document is
+            the point — a statement. On a receipt it was a third route to
+            paper next to the shop's own thermal printer and the PDF, and on
+            a phone with no printer set up it is a dead end. */}
+        {!!print && (
+          <>
+            <Button
+              title="Print"
+              variant="secondary"
+              onPress={() => print(buildHtml(), documentKey)}
+              loading={working && busy === 'print'}
+              disabled={blocked}
+              style={[styles.action, compact && styles.compact]}
+            />
+            <View style={styles.gap} />
+          </>
+        )}
         <Button
           title="Save as PDF"
           variant="secondary"
@@ -69,6 +81,17 @@ const DocumentActions = ({
           style={[styles.action, compact && styles.compact]}
         />
       </View>
+      {!!buildCsv && !!shareAsCsv && (
+        <Button
+          title="Export as CSV"
+          icon="grid-outline"
+          variant="secondary"
+          onPress={() => shareAsCsv(buildCsv(), label, documentKey)}
+          loading={working && busy === 'csv'}
+          disabled={blocked}
+          style={[styles.csv, compact && styles.compact]}
+        />
+      )}
       {disabled && !busy && (
         <Text style={styles.hint}>Loading your bill details…</Text>
       )}
@@ -79,6 +102,7 @@ const DocumentActions = ({
 
 const styles = StyleSheet.create({
   thermal: { marginBottom: SPACING.sm },
+  csv: { marginTop: SPACING.sm },
   row: { flexDirection: 'row' },
   action: { flex: 1 },
   compact: { minHeight: 40 },
