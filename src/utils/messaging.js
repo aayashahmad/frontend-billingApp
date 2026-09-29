@@ -80,17 +80,57 @@ export const buildBalanceMessage = ({ customer, shopName, dueNote } = {}) => {
   );
 };
 
-/** A single bill, for sending right after the sale. */
+/**
+ * A single bill, for sending right after the sale.
+ *
+ * Says how the bill was actually settled, not merely whether anything is
+ * still owed on it. A bill covered by the customer's own credit leaves
+ * nothing outstanding but nothing was paid either, and telling somebody
+ * they "paid in full" when they handed over no money is the kind of wrong
+ * that gets argued about at the counter.
+ *
+ * The account position is a separate sentence, because a bill settled in
+ * full says nothing about what earlier bills left owing.
+ */
 export const buildBillMessage = ({ customer, bill, shopName } = {}) => {
   const name = customer?.name?.trim() || 'Customer';
   const shop = shopName?.trim() || 'our shop';
   const total = formatCurrency(toNumber(bill?.bill_total));
-  const owed = toNumber(bill?.unbalance);
 
-  const settlement =
-    owed > 0
-      ? ` Balance due: ${formatCurrency(owed)}.`
-      : ' Paid in full — thank you!';
+  const paid = toNumber(bill?.amount_paid);
+  const fromAdvance = toNumber(bill?.advance_applied);
+  const owedOnBill = toNumber(bill?.unbalance);
+  // What the shop received beyond this bill became credit, so it is not
+  // money the customer is out of pocket for this sale.
+  const toAdvance = toNumber(bill?.advance_added);
+  const received = Math.max(paid - toAdvance, 0);
 
-  return `Hello ${name}, your bill from ${shop} is ${total}.${settlement}`;
+  let settlement;
+  if (owedOnBill > 0) {
+    settlement =
+      received > 0 || fromAdvance > 0
+        ? `Part-paid; ${formatCurrency(owedOnBill)} still due on this bill.`
+        : `Added to your account — ${formatCurrency(owedOnBill)} due.`;
+  } else if (fromAdvance > 0 && received > 0) {
+    settlement =
+      `${formatCurrency(received)} paid and ` +
+      `${formatCurrency(fromAdvance)} taken from your advance.`;
+  } else if (fromAdvance > 0) {
+    settlement = `Settled from your advance balance — nothing to pay.`;
+  } else {
+    settlement = 'Paid in full — thank you!';
+  }
+
+  // Where the account stands now. Omitted when it is square both ways,
+  // which is the only case where the bill line already says everything.
+  const outstanding = toNumber(customer?.total_unpaid);
+  const advanceLeft = toNumber(customer?.advance_balance);
+  let account = '';
+  if (outstanding > 0) {
+    account = ` Total outstanding on your account: ${formatCurrency(outstanding)}.`;
+  } else if (advanceLeft > 0) {
+    account = ` Advance remaining: ${formatCurrency(advanceLeft)}.`;
+  }
+
+  return `Hello ${name}, your bill from ${shop} is ${total}. ${settlement}${account}`;
 };
