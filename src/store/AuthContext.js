@@ -8,6 +8,10 @@ import {
   useState,
 } from 'react';
 
+import {
+  registerForPushNotifications,
+  unregisterPushNotifications,
+} from '../services/pushNotifications';
 import { isCancelled, setAuthToken, setUnauthorizedHandler } from '../services/api';
 import * as authService from '../services/authService';
 import {
@@ -45,6 +49,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Before the token goes: the server has to be told to stop pushing this
+    // shop's overdue list to a phone somebody has signed out of, and that
+    // call needs the session that is about to be thrown away.
+    await unregisterPushNotifications();
     applySession(null);
     setError(null);
     await clearSession();
@@ -63,6 +71,14 @@ export const AuthProvider = ({ children }) => {
       active = false;
     };
   }, [applySession]);
+
+  // Tell the server where this shop's daily reminder summary should go.
+  // Fire-and-forget: a refused permission or a simulator returns null, and
+  // neither is worth interrupting somebody who has just signed in.
+  useEffect(() => {
+    if (!session?.token) return;
+    registerForPushNotifications();
+  }, [session?.token]);
 
   // A 401 from any request drops the dead session. The notice is set only
   // when there WAS a session — a wrong password on the login screen also

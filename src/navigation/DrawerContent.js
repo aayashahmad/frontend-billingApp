@@ -20,6 +20,11 @@ const DRAWER_ITEMS = [
   { route: 'ProductsRoot', label: 'Products', icon: 'pricetags-outline' },
   { route: 'ReportsRoot', label: 'Reports', icon: 'bar-chart-outline' },
   {
+    route: 'RemindersRoot',
+    label: 'Reminders',
+    icon: 'notifications-outline',
+  },
+  {
     route: 'BusinessProfileRoot',
     label: 'Bill Details',
     icon: 'document-text-outline',

@@ -18,6 +18,7 @@ import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
+import RemindersScreen from '../features/reminders/RemindersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
 import PrinterScreen from '../screens/PrinterScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -34,6 +35,7 @@ const Tab = createBottomTabNavigator();
 const AuthStack = createNativeStackNavigator();
 const NewBillStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
+const RemindersStack = createNativeStackNavigator();
 const PrinterStack = createNativeStackNavigator();
 const ProductsStack = createNativeStackNavigator();
 const ReportsStack = createNativeStackNavigator();
@@ -115,6 +117,16 @@ const NewBillNavigator = () => (
       options={{ title: 'Customer' }}
     />
   </NewBillStack.Navigator>
+);
+
+const RemindersNavigator = () => (
+  <RemindersStack.Navigator screenOptions={stackScreenOptions}>
+    <RemindersStack.Screen
+      name="Reminders"
+      component={RemindersScreen}
+      options={rootScreenOptions('Reminders')}
+    />
+  </RemindersStack.Navigator>
 );
 
 const MyCustomersNavigator = () => (
@@ -263,6 +275,11 @@ const MainTabs = () => {
           tabBarIcon: tabIcon('bar-chart-outline', 'bar-chart'),
         }}
       />
+    <Tab.Screen
+      name="RemindersRoot"
+      component={RemindersNavigator}
+      options={{ title: 'Reminders', ...hiddenTab }}
+    />
     <Tab.Screen
       name="BusinessProfileRoot"
       component={BusinessNavigator}
