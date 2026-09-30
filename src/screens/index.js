@@ -8,5 +8,4 @@ export { default as PrinterScreen } from './PrinterScreen';
 export { default as ProductsScreen } from './ProductsScreen';
 export { default as ProfileScreen } from './ProfileScreen';
 export { default as ReportsScreen } from './ReportsScreen';
-export { default as SearchScreen } from './SearchScreen';
 export { default as SignupScreen } from './SignupScreen';

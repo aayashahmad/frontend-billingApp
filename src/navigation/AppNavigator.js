@@ -24,7 +24,6 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ProductsScreen from '../screens/ProductsScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import SearchScreen from '../screens/SearchScreen';
 import SignupScreen from '../screens/SignupScreen';
 import { useAuth } from '../store/AuthContext';
 import { useProfile } from '../store/ProfileContext';
@@ -34,7 +33,6 @@ const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
 const AuthStack = createNativeStackNavigator();
 const NewBillStack = createNativeStackNavigator();
-const CustomersStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
 const PrinterStack = createNativeStackNavigator();
 const ProductsStack = createNativeStackNavigator();
@@ -117,21 +115,6 @@ const NewBillNavigator = () => (
       options={{ title: 'Customer' }}
     />
   </NewBillStack.Navigator>
-);
-
-const CustomersNavigator = () => (
-  <CustomersStack.Navigator screenOptions={stackScreenOptions}>
-    <CustomersStack.Screen
-      name="SearchCustomers"
-      component={SearchScreen}
-      options={rootScreenOptions('Search')}
-    />
-    <CustomersStack.Screen
-      name="CustomerDetail"
-      component={CustomerDetailScreen}
-      options={{ title: 'Customer' }}
-    />
-  </CustomersStack.Navigator>
 );
 
 const MyCustomersNavigator = () => (
@@ -278,14 +261,6 @@ const MainTabs = () => {
         options={{
           title: 'Reports',
           tabBarIcon: tabIcon('bar-chart-outline', 'bar-chart'),
-        }}
-      />
-      <Tab.Screen
-        name="CustomersTab"
-        component={CustomersNavigator}
-        options={{
-          title: 'Search',
-          tabBarIcon: tabIcon('search-outline', 'search'),
         }}
       />
     <Tab.Screen
