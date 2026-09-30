@@ -4,9 +4,11 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import Input from '../../components/Input';
+import SelectField from '../../components/SelectField';
 import StateView from '../../components/StateView';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useMyCustomers } from '../../hooks/useMyCustomers';
+import { KHATA_CHOICES, formatKhataRef } from '../../utils/khata';
 import { setOpeningBalances } from '../../services/customerService';
 import { formatCurrency } from '../../utils/money';
 
@@ -27,7 +29,10 @@ const keyExtractor = (customer) => String(customer.id);
 const OpeningBalancesScreen = () => {
   const { customers, loading, error, refresh } = useMyCustomers();
   const [drafts, setDrafts] = useState({});
-  const [reference, setReference] = useState('');
+  // One book at a time, so the khata number belongs to the screen. The
+  // page does not: every customer sits on a different page, and one page
+  // number stamped across the whole migration says nothing at all.
+  const [khata, setKhata] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [savedCount, setSavedCount] = useState(0);
@@ -47,7 +52,7 @@ const OpeningBalancesScreen = () => {
     setSavedCount(0);
     setDrafts((current) => ({
       ...current,
-      [id]: { side: DUE, amount: '', ...current[id], ...patch },
+      [id]: { side: DUE, amount: '', page: '', ...current[id], ...patch },
     }));
   }, []);
 
@@ -58,9 +63,10 @@ const OpeningBalancesScreen = () => {
           customerId: Number(id),
           amount: Number(draft.amount),
           balanceType: draft.side,
+          reference: formatKhataRef({ khata, page: draft.page }),
         }))
         .filter((entry) => Number.isFinite(entry.amount) && entry.amount > 0),
-    [drafts],
+    [drafts, khata],
   );
 
   const handleSave = useCallback(async () => {
@@ -73,7 +79,6 @@ const OpeningBalancesScreen = () => {
           // Dated now, because a carried-over debt with no date is invisible
           // to reminders — the oldest debts would be the only unchased ones.
           asOf: new Date().toISOString(),
-          reference,
         })),
       );
       setSavedCount(applied);
@@ -84,11 +89,11 @@ const OpeningBalancesScreen = () => {
     } finally {
       setSaving(false);
     }
-  }, [entries, reference, refresh]);
+  }, [entries, refresh]);
 
   const renderItem = useCallback(
     ({ item }) => {
-      const draft = drafts[item.id] ?? { side: DUE, amount: '' };
+      const draft = drafts[item.id] ?? { side: DUE, amount: '', page: '' };
       const existing = Number(item.opening_balance) || 0;
 
       return (
@@ -142,6 +147,14 @@ const OpeningBalancesScreen = () => {
               editable={!saving}
               containerStyle={styles.amount}
             />
+            <Input
+              placeholder="Page"
+              value={draft.page}
+              onChangeText={(text) => setDraft(item.id, { page: text })}
+              editable={!saving}
+              maxLength={10}
+              containerStyle={styles.page}
+            />
           </View>
         </Card>
       );
@@ -158,14 +171,16 @@ const OpeningBalancesScreen = () => {
           paid ahead. Nothing is saved until you press the button at the
           bottom, and none of it counts as a sale.
         </Text>
-        <Input
-          label="Book reference (optional)"
-          placeholder="Khata 3"
-          value={reference}
-          onChangeText={setReference}
-          editable={!saving}
-          maxLength={100}
-          hint="Recorded against every balance you enter here"
+        <SelectField
+          label="Khata number"
+          value={khata ? `Khata ${khata}` : ''}
+          options={KHATA_CHOICES.map((n) => `Khata ${n}`)}
+          onChange={(choice) => setKhata(choice.replace(/^khata\s*/i, ''))}
+          placeholder="Which book are you copying from?"
+          hint="Recorded with each customer's own page number below"
+          disabled={saving}
+          customPlaceholder="e.g. 3A, or Red ledger"
+          style={styles.khata}
         />
         <Input
           placeholder="Filter by name or phone"
@@ -182,7 +197,7 @@ const OpeningBalancesScreen = () => {
         )}
       </Card>
     ),
-    [filter, reference, saving, savedCount],
+    [filter, khata, saving, savedCount],
   );
 
   if (loading) return <StateView variant="loading" />;
@@ -238,6 +253,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     marginBottom: SPACING.md,
   },
+  khata: { marginBottom: SPACING.md },
   filter: { marginBottom: 0 },
   saved: {
     fontSize: FONT_SIZES.sm,
@@ -271,6 +287,7 @@ const styles = StyleSheet.create({
   sideText: { fontSize: FONT_SIZES.xs, color: COLORS.textLight },
   sideTextActive: { color: COLORS.primary, fontWeight: '700' },
   amount: { flex: 1, marginBottom: 0 },
+  page: { width: 84, marginLeft: SPACING.sm, marginBottom: 0 },
   footer: {
     padding: SPACING.md,
     backgroundColor: COLORS.card,

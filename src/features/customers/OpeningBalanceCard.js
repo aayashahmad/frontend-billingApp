@@ -4,9 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import Input from '../../components/Input';
+import SelectField from '../../components/SelectField';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { formatDateTime } from '../../utils/date';
 import { formatCurrency } from '../../utils/money';
+import { KHATA_CHOICES, formatKhataRef, parseKhataRef } from '../../utils/khata';
 
 const DUE = 'due';
 const ADVANCE = 'advance';
@@ -30,9 +32,12 @@ const OpeningBalanceCard = ({ customer, saving, error, onSave }) => {
 
   const [amount, setAmount] = useState(hasStored ? String(stored) : '');
   const [side, setSide] = useState(customer?.opening_balance_type || DUE);
-  const [reference, setReference] = useState(
-    customer?.opening_balance_ref || '',
-  );
+  // Split for editing, rejoined on save. Stored as one string because
+  // shops number their books however they like — the picker is a
+  // convenience, never a constraint on what can be written down.
+  const stored_ref = parseKhataRef(customer?.opening_balance_ref);
+  const [khata, setKhata] = useState(stored_ref.khata);
+  const [page, setPage] = useState(stored_ref.page);
   const [touched, setTouched] = useState(false);
 
   // Re-sync on reload, unless the owner is mid-edit — losing a half-typed
@@ -41,7 +46,9 @@ const OpeningBalanceCard = ({ customer, saving, error, onSave }) => {
     if (touched) return;
     setAmount(hasStored ? String(stored) : '');
     setSide(customer?.opening_balance_type || DUE);
-    setReference(customer?.opening_balance_ref || '');
+    const parsed = parseKhataRef(customer?.opening_balance_ref);
+    setKhata(parsed.khata);
+    setPage(parsed.page);
   }, [
     customer?.opening_balance_ref,
     customer?.opening_balance_type,
@@ -57,7 +64,7 @@ const OpeningBalanceCard = ({ customer, saving, error, onSave }) => {
     !invalid &&
     (String(stored ?? '') !== amount.trim() ||
       (customer?.opening_balance_type || DUE) !== side ||
-      (customer?.opening_balance_ref || '') !== reference.trim());
+      (customer?.opening_balance_ref || '') !== formatKhataRef({ khata, page }));
 
   const handleSave = useCallback(() => {
     const value = amount.trim() === '' ? null : parsed;
@@ -68,10 +75,10 @@ const OpeningBalanceCard = ({ customer, saving, error, onSave }) => {
       // with no date is invisible to reminders, which would quietly exempt
       // the oldest debts in the book from ever being chased.
       asOf: value === null ? null : new Date().toISOString(),
-      reference,
+      reference: formatKhataRef({ khata, page }),
     });
     setTouched(false);
-  }, [amount, onSave, parsed, reference, side]);
+  }, [amount, khata, onSave, page, parsed, side]);
 
   return (
     <Card style={styles.card}>
@@ -147,18 +154,36 @@ const OpeningBalanceCard = ({ customer, saving, error, onSave }) => {
         hint="Leave empty to remove the opening balance"
       />
 
-      <Input
-        label="Khata / page number"
-        placeholder="Khata 3, page 47"
-        value={reference}
-        onChangeText={(text) => {
-          setTouched(true);
-          setReference(text);
-        }}
-        editable={!saving}
-        maxLength={100}
-        hint="Where it came from, for when the figure is questioned later"
-      />
+      <View style={styles.book}>
+        <SelectField
+          label="Khata number"
+          value={khata ? `Khata ${khata}` : ''}
+          options={KHATA_CHOICES.map((n) => `Khata ${n}`)}
+          onChange={(choice) => {
+            setTouched(true);
+            setKhata(choice.replace(/^khata\s*/i, ''));
+          }}
+          placeholder="Which book"
+          disabled={saving}
+          customPlaceholder="e.g. 3A, or Red ledger"
+          style={styles.bookField}
+        />
+        <Input
+          label="Page"
+          placeholder="47"
+          value={page}
+          onChangeText={(text) => {
+            setTouched(true);
+            setPage(text);
+          }}
+          editable={!saving}
+          maxLength={10}
+          containerStyle={styles.pageField}
+        />
+      </View>
+      <Text style={styles.bookHint}>
+        Where it came from, for when the figure is questioned later
+      </Text>
 
       {dirty && (
         <Button
@@ -196,6 +221,15 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textLight,
     marginTop: SPACING.xs,
+  },
+  book: { flexDirection: 'row', alignItems: 'flex-start' },
+  bookField: { flex: 1 },
+  pageField: { width: 90, marginLeft: SPACING.sm, marginBottom: 0 },
+  bookHint: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   sides: { flexDirection: 'row', marginBottom: SPACING.md },
   side: {
