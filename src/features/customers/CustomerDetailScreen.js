@@ -19,7 +19,10 @@ import { PAYMENT_TYPE_LABELS } from '../../constants/paymentTypes';
 import TransactionImageModal from '../../components/TransactionImageModal';
 import { COLORS, FONT_SIZES, RADIUS, SPACING } from '../../constants/theme';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
-import { updateCreditLimit } from '../../services/customerService';
+import {
+  setOpeningBalance,
+  updateCreditLimit,
+} from '../../services/customerService';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { useProfile } from '../../store/ProfileContext';
 import {
@@ -32,6 +35,7 @@ import DocumentActions from '../printing/DocumentActions';
 import { buildBalanceMessage } from '../../utils/messaging';
 import { buildCustomerStatementCsv } from '../printing/statementCsv';
 import ContactActions from './ContactActions';
+import OpeningBalanceCard from './OpeningBalanceCard';
 import RecordPaymentModal from './RecordPaymentModal';
 import {
   buildBillReceiptHtml,
@@ -72,6 +76,29 @@ const CustomerDetailScreen = ({ route, navigation }) => {
     },
     [customerId, refresh],
   );
+  // Same shape as the limit, and separate for the same reason: an opening
+  // balance is a correction to the shop's own records, not a transaction.
+  const [savingOpening, setSavingOpening] = useState(false);
+  const [openingError, setOpeningError] = useState(null);
+
+  const handleSaveOpeningBalance = useCallback(
+    async (values) => {
+      setSavingOpening(true);
+      setOpeningError(null);
+      try {
+        await setOpeningBalance(customerId, values);
+        await refresh();
+        return true;
+      } catch (err) {
+        setOpeningError(err?.message || 'Could not save the opening balance.');
+        return false;
+      } finally {
+        setSavingOpening(false);
+      }
+    },
+    [customerId, refresh],
+  );
+
   const { profile: owner, profileLoaded } = useProfile();
   // Two separate selections: opening the payment image from inside the detail
   // sheet must not close the sheet underneath it.
@@ -326,6 +353,12 @@ const CustomerDetailScreen = ({ route, navigation }) => {
             shopName: owner?.business_name || owner?.username,
           })}
           style={styles.contactActions}
+        />
+        <OpeningBalanceCard
+          customer={customer}
+          saving={savingOpening}
+          error={openingError}
+          onSave={handleSaveOpeningBalance}
         />
         <CreditLimitCard
           customer={customer}

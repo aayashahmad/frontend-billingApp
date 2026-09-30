@@ -86,6 +86,30 @@ export const buildCustomerStatementCsv = ({
   lines.push(row(['BILLS']));
   lines.push(row(BILL_HEADERS));
 
+  // The paper-book balance opens the ledger, before any bill. A sheet that
+  // starts at the first bill does not reconcile against the shop's books.
+  if (toNumber(customer?.opening_balance)) {
+    const carried = toNumber(customer.opening_balance);
+    const isAdvance = customer.opening_balance_type === 'advance';
+    lines.push(
+      row([
+        customer.opening_balance_date
+          ? formatDateTime(customer.opening_balance_date)
+          : '',
+        customer.opening_balance_ref || 'Opening',
+        'Balance brought forward',
+        '',
+        '',
+        '',
+        '',
+        isAdvance ? 'advance' : 'due',
+        '',
+        isAdvance ? amount(carried) : '',
+        isAdvance ? '' : amount(carried),
+      ]),
+    );
+  }
+
   bills.forEach((bill) => {
     const { billTotal, amountPaid, unbalance } = summariseBill(bill);
     const items = billItems(bill);

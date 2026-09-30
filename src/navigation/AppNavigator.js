@@ -18,6 +18,7 @@ import CustomerDetailScreen from '../screens/CustomerDetailScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MyCustomersScreen from '../screens/MyCustomersScreen';
+import OpeningBalancesScreen from '../features/customers/OpeningBalancesScreen';
 import RemindersScreen from '../features/reminders/RemindersScreen';
 import NewBillScreen from '../screens/NewBillScreen';
 import PrinterScreen from '../screens/PrinterScreen';
@@ -36,6 +37,7 @@ const AuthStack = createNativeStackNavigator();
 const NewBillStack = createNativeStackNavigator();
 const MyCustomersStack = createNativeStackNavigator();
 const RemindersStack = createNativeStackNavigator();
+const OpeningBalancesStack = createNativeStackNavigator();
 const PrinterStack = createNativeStackNavigator();
 const ProductsStack = createNativeStackNavigator();
 const ReportsStack = createNativeStackNavigator();
@@ -117,6 +119,16 @@ const NewBillNavigator = () => (
       options={{ title: 'Customer' }}
     />
   </NewBillStack.Navigator>
+);
+
+const OpeningBalancesNavigator = () => (
+  <OpeningBalancesStack.Navigator screenOptions={stackScreenOptions}>
+    <OpeningBalancesStack.Screen
+      name="OpeningBalances"
+      component={OpeningBalancesScreen}
+      options={rootScreenOptions('Opening balances')}
+    />
+  </OpeningBalancesStack.Navigator>
 );
 
 const RemindersNavigator = () => (
@@ -275,6 +287,11 @@ const MainTabs = () => {
           tabBarIcon: tabIcon('bar-chart-outline', 'bar-chart'),
         }}
       />
+    <Tab.Screen
+      name="OpeningBalancesRoot"
+      component={OpeningBalancesNavigator}
+      options={{ title: 'Opening balances', ...hiddenTab }}
+    />
     <Tab.Screen
       name="RemindersRoot"
       component={RemindersNavigator}

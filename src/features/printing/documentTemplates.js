@@ -105,6 +105,7 @@ const BASE_STYLES = `
     padding: 8px 6px;
   }
   td { padding: 8px 6px; border-bottom: 1px solid #F1F5F9; }
+  tr.brought-forward td { background: #FEF3C7; }
   .num { text-align: right; white-space: nowrap; }
   tfoot td {
     border-top: 1px solid #0F172A;
@@ -434,6 +435,38 @@ export const buildBillReceiptHtml = ({ bill, customer, owner }) => {
   return wrap(`Receipt ${bill?.id ?? ''}`, body);
 };
 
+/**
+ * The "balance brought forward" line opening a statement.
+ *
+ * A customer who came across from the shop's paper book has a balance with
+ * no bill behind it. Without this line the statement's own arithmetic does
+ * not close, and a statement that does not add up is one the customer stops
+ * believing — which is the only thing a statement is for.
+ */
+const broughtForwardRow = (customer) => {
+  const amount = toNumber(customer?.opening_balance);
+  if (!amount) return '';
+
+  const isAdvance = customer.opening_balance_type === 'advance';
+  const reference = customer.opening_balance_ref
+    ? ` (${escapeHtml(customer.opening_balance_ref)})`
+    : '';
+  const when = customer.opening_balance_date
+    ? formatDateTime(customer.opening_balance_date)
+    : '—';
+
+  return `
+    <tr class="brought-forward">
+      <td>${escapeHtml(when)}</td>
+      <td colspan="3"><strong>Balance brought forward</strong>${reference}</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num ${isAdvance ? '' : 'due'}">${
+        isAdvance ? `(${formatCurrency(amount)})` : formatCurrency(amount)
+      }</td>
+    </tr>`;
+};
+
 /** Full account statement covering every bill for one customer. */
 export const buildCustomerStatementHtml = ({
   customer,
@@ -506,7 +539,7 @@ export const buildCustomerStatementHtml = ({
           <th class="num">Balance</th>
         </tr>
       </thead>
-      <tbody>${rows}</tbody>
+      <tbody>${broughtForwardRow(customer)}${rows}</tbody>
     </table>
 
     ${

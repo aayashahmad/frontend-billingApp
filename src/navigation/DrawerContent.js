@@ -18,6 +18,11 @@ const DRAWER_ITEMS = [
   { route: 'NewBillTab', label: 'Billing', icon: 'receipt-outline' },
   { route: 'MyCustomersRoot', label: 'My Customers', icon: 'people-outline' },
   { route: 'ProductsRoot', label: 'Products', icon: 'pricetags-outline' },
+  {
+    route: 'OpeningBalancesRoot',
+    label: 'Opening balances',
+    icon: 'book-outline',
+  },
   { route: 'ReportsRoot', label: 'Reports', icon: 'bar-chart-outline' },
   {
     route: 'RemindersRoot',

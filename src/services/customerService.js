@@ -78,3 +78,65 @@ export const updateCreditLimit = async (customerId, limit, { signal } = {}) => {
   const { data } = await api.put(`/customers/${customerId}`, body, { signal });
   return data;
 };
+
+
+/**
+ * What a customer already owed when the shop left its paper book.
+ *
+ * `amount` of null clears it — which is how a shop undoes a figure typed
+ * wrong on migration day. The server applies the change as a difference, so
+ * calling this twice does not double the balance.
+ */
+export const setOpeningBalance = async (
+  customerId,
+  { amount, balanceType, asOf, reference, note } = {},
+  { signal } = {},
+) => {
+  const { data } = await api.put(
+    `/customers/${customerId}/opening-balance`,
+    {
+      amount: amount === null || amount === undefined ? null : Number(amount),
+      balance_type: balanceType ?? null,
+      as_of: asOf ?? null,
+      reference: reference?.trim() || null,
+      note: note?.trim() || null,
+    },
+    { signal },
+  );
+  return {
+    amount: data?.amount ?? null,
+    balanceType: data?.balance_type ?? null,
+    asOf: data?.as_of ?? null,
+    reference: data?.reference ?? null,
+    note: data?.note ?? null,
+    totalUnpaid: Number(data?.total_unpaid ?? 0),
+    advanceBalance: Number(data?.advance_balance ?? 0),
+  };
+};
+
+/**
+ * A whole khata at once.
+ *
+ * One request rather than one per customer: a shop migrating two hundred
+ * customers over patchy mobile data would otherwise be halfway through when
+ * the signal drops, with no way to tell which half. The server commits once.
+ */
+export const setOpeningBalances = async (entries, { signal } = {}) => {
+  const { data } = await api.post(
+    '/customers/opening-balances',
+    {
+      entries: entries.map((entry) => ({
+        customer_id: entry.customerId,
+        amount:
+          entry.amount === null || entry.amount === undefined
+            ? null
+            : Number(entry.amount),
+        balance_type: entry.balanceType ?? null,
+        as_of: entry.asOf ?? null,
+        reference: entry.reference?.trim() || null,
+      })),
+    },
+    { signal },
+  );
+  return Number(data?.applied ?? 0);
+};

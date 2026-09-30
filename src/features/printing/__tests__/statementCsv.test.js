@@ -97,3 +97,57 @@ describe('buildCustomerStatementCsv', () => {
     expect(csv).toContain('9876543210');
   });
 });
+
+
+describe('opening balance on the statement', () => {
+  const carried = {
+    ...customer,
+    opening_balance: 5000,
+    opening_balance_type: 'due',
+    opening_balance_ref: 'Khata 3, page 47',
+    opening_balance_date: '2025-04-01T10:00:00Z',
+  };
+
+  it('opens the ledger with the balance brought forward', () => {
+    const rows = parse(
+      buildCustomerStatementCsv({ customer: carried, bills: [bill], owner }),
+    );
+    const headerIndex = rows.findIndex((row) => row.includes('Item'));
+    const broughtForward = rows.findIndex((row) =>
+      row.some((cell) => cell.includes('Balance brought forward')),
+    );
+    const firstBill = rows.findIndex((row) => row.includes('Rice'));
+
+    expect(broughtForward).toBeGreaterThan(headerIndex);
+    expect(broughtForward).toBeLessThan(firstBill);
+  });
+
+  it('records the book it came from', () => {
+    const csv = buildCustomerStatementCsv({
+      customer: carried,
+      bills: [],
+      owner,
+    });
+    expect(csv).toContain('Khata 3, page 47');
+    expect(csv).toContain('5000.00');
+  });
+
+  it('puts a carried-over credit in the advance column, not the debt one', () => {
+    const rows = parse(
+      buildCustomerStatementCsv({
+        customer: { ...carried, opening_balance_type: 'advance' },
+        bills: [],
+        owner,
+      }),
+    );
+    const line = rows.find((row) =>
+      row.some((cell) => cell.includes('Balance brought forward')),
+    );
+    expect(line).toContain('advance');
+  });
+
+  it('writes nothing at all for a customer who came with no balance', () => {
+    const csv = buildCustomerStatementCsv({ customer, bills: [bill], owner });
+    expect(csv).not.toContain('brought forward');
+  });
+});
